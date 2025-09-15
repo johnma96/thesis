@@ -4,7 +4,7 @@ import pyprojroot
 from glob   import glob
 from typing import Union
 
-class AbsolutePaths:
+class PathManager:
     """
     Class for manipulating absolute paths within the package.
 
