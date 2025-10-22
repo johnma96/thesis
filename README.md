@@ -122,3 +122,6 @@ For more details consult:
 
 ### Installing and updating project libraries.
 The required libraries are listed in the file [`requirements.txt`](/requirements.txt) or [`environment.yml`](/environment.yml). **Please read [the installation guide](/install.md) information for greater detail.**
+
+## 🚀 Configuración de DVC con Google Drive (OAuth personalizado)
+Puede tomar como referencia lo descrito en la [fuente oficial](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive), lo mencionado en este hilo de [stackoverflow](https://stackoverflow.com/questions/75454425/access-blocked-project-has-not-completed-the-google-verification-process) (Es importante que mire los comentarios ya que describen la última interfaz gráfica de GCP). También puede consultar la información del paso paso [aquí](docs/README_DVC_GoogleDrive.md)

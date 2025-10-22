@@ -46,3 +46,4 @@ pyprojroot==0.3.0
 python-dotenv==1.1.0
 rasterio==1.4.3
 spectral==0.24
+dvc[gdrive]==3.63.0
