@@ -7,8 +7,8 @@ import pandas as pd
 
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from spectra_bean.models import Predict
-from spectra_bean.utils import PathManager
+from spectralcrop.models import Predict
+from spectralcrop.utils import PathManager
 
 #--- Time zone for date handling
 timezone_colombia = pytz.timezone('America/Bogota')
