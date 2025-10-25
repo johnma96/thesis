@@ -146,31 +146,92 @@ class HypercubeProcessor:
     # 3) Guardar reflectancia cruda en Zarr (streaming)
     # -------------------------------------------------------
 
-    def save_reflectance_to_zarr(self,
-                                 zarr_path: str,
-                                 exclude_water: bool = True,
-                                 water_windows: Optional[Tuple[Tuple[float, float], ...]] = None,
-                                 min_lambda: Optional[float] = None,
-                                 max_lambda: Optional[float] = None,
-                                 chunks: Tuple[int, int, int] = (64, 512, 512),
-                                 compressor: Optional[str] = 'zstd',
-                                 clevel: int = 5,
-                                 add_coords: bool = True,
-                                 add_ndvi: bool = False,
-                                 ndvi_threshold: float = 0.3) -> None:
-        """
-        Escribe el cubo de reflectancia cruda en Zarr como variable 'reflectance'.
-        - Excluye bandas en ventanas de agua (opcional).
-        - Añade coords 'wavelength' y 'fwhm' (si existen).
-        - (Opcional) Guarda NDVI y veg_mask en el mismo Zarr.
 
-        chunks: (band, y, x) recomendado para acceso eficiente.
+    def _open_zarr_group_compat(self, zarr_path: str, overwrite: bool = True):
         """
-        os.makedirs(os.path.dirname(zarr_path), exist_ok=True)
+        Abre/crea un grupo Zarr en 'zarr_path' compatible con Zarr v2 y v3.
+        Retorna (root, store, zarr_major) y borra la ruta si overwrite=True.
+        """
+        import os, shutil
+        import zarr
+
+        # Limpieza si se pide overwrite
+        if overwrite and os.path.isdir(zarr_path):
+            shutil.rmtree(zarr_path)
+
+        # 1) Intento: Zarr v2 toplevel
+        if hasattr(zarr, 'DirectoryStore'):
+            try:
+                store = zarr.DirectoryStore(zarr_path)
+                root = zarr.group(store=store, overwrite=True)
+                return root, store, 2
+            except Exception:
+                pass
+
+        # 2) Intento: Zarr v2 desde zarr.storage
+        try:
+            from zarr.storage import DirectoryStore as _DirStore
+            store = _DirStore(zarr_path)
+            root = zarr.group(store=store, overwrite=True)
+            return root, store, 2
+        except Exception:
+            pass
+
+        # 3) Intento: Zarr v3 FSStore
+        try:
+            from zarr.storage import FSStore as _FSStore
+            store = _FSStore(zarr_path, mode='w')  # crea si no existe
+            # En v3, group(...) no acepta overwrite; el store ya está limpio por 'mode=w'
+            root = zarr.group(store=store)
+            return root, store, 3
+        except Exception:
+            pass
+
+        # 4) Último recurso: fsspec mapper (sirve en v2/v3)
+        try:
+            import fsspec
+            store = fsspec.get_mapper(zarr_path)
+            try:
+                root = zarr.group(store=store, overwrite=True)  # v2
+            except TypeError:
+                root = zarr.group(store=store)                  # v3
+            return root, store, None
+        except Exception as e:
+            raise RuntimeError(
+                "No se pudo abrir/crear un Zarr store compatible (v2/v3). "
+                "Considera fijar versión con 'pip install \"zarr<3\"'."
+            ) from e
+
+    def save_reflectance_to_zarr(self,
+                                zarr_path: str,
+                                exclude_water: bool = True,
+                                water_windows=None,      # si None, usa self.water_windows
+                                min_lambda: float = None,
+                                max_lambda: float = None,
+                                chunks=(64, 512, 512),   # (band, y, x)
+                                add_coords: bool = True,
+                                add_ndvi: bool = True,
+                                ndvi_threshold: float = 0.3) -> None:
+        """
+        Guarda reflectance (band,y,x) + coords + (opcional) NDVI/veg_mask en zarr_path,
+        usando la API de alto nivel recomendada por Zarr:
+        - zarr.open_group(<ruta>, mode="w")
+        - root.create_array(...)
+        """
+        import os
+        import shutil
+        import numpy as np
+        import zarr
+
+        # 0) Limpiar destino si existe
+        print('[INFO] Guardando reflectance en Zarr...')
+        if os.path.isdir(zarr_path):
+            shutil.rmtree(zarr_path)
 
         B, H, W = self.img.nbands, self.img.nrows, self.img.ncols
 
-        # Determinar bandas a exportar
+        # 1) Selección de bandas válidas
+        print('[INFO] Seleccionando bandas válidas...')
         valid_bands = self.build_valid_bands(
             wavelengths=self.wavelengths,
             water_windows=water_windows,
@@ -180,35 +241,39 @@ class HypercubeProcessor:
         )
         if valid_bands is None:
             valid_bands = np.arange(B, dtype=int)
+        valid_bands = np.asarray(valid_bands, dtype=int)
         B_out = int(len(valid_bands))
 
-        # Crear el Zarr
-        store = zarr.DirectoryStore(zarr_path)
-        cname = 'zstd' if compressor is None else compressor
-        zcompressor = Blosc(cname=cname, clevel=int(clevel), shuffle=Blosc.SHUFFLE)
+        # 2) Abrir/crear grupo en disco (recomendado por docs oficiales)
+        #    Crea el directorio <zarr_path> y organiza arrays como sub-rutas.
+        print('[INFO] Creando Zarr group en disco...')
+        root = zarr.open_group(zarr_path, mode='w')  # ← clave: API estable por ruta
 
-        root = zarr.group(store=store, overwrite=True)
-        zarr_arr = root.create(
+        # 3) Crear array "reflectance" (band, y, x)
+        print('[INFO] Creando array "reflectance"...')
+        arr_reflect = root.create_array(
             name='reflectance',
             shape=(B_out, H, W),
             chunks=chunks,
-            dtype='float32',
-            compressor=zcompressor
+            dtype='float32'
+            # No pasamos "compressor": usamos el codec por defecto de Zarr
         )
 
-        # Escribir banda por banda
+        # 4) Escribir banda por banda
+        print('[INFO] Escribiendo bandas de reflectance...')
         for i, bi in enumerate(valid_bands):
             refl = self.to_reflectance(
-                int(bi),
+                band_i=int(bi),
                 clip=(0.0, 1.2),
-                skip_if_water=True,  # redundante (ya filtramos), pero seguro
-                wavelengths=self.wavelengths,
+                skip_if_water=True,           # redundante tras filtrar, pero seguro
+                wavelengths=self.wavelengths, # permitido por tu firma actual
                 water_windows=water_windows
             )
-            zarr_arr[i, :, :] = refl  # NaN se almacenan tal cual
+            arr_reflect[i, :, :] = refl  # NaN se almacenan tal cual
 
-        # Metadatos/attrs
-        root.attrs['attrs'] = {
+        # 5) Atributos del grupo
+        print('[INFO] Agregando atributos al grupo Zarr...')
+        root.attrs.put({
             'description': 'Reflectance cube (raw) without Savitzky–Golay',
             'units': 'unitless',
             'scale_applied': float(self.scale),
@@ -216,44 +281,42 @@ class HypercubeProcessor:
             'nodata': 'NaN',
             'exclude_water_windows': bool(exclude_water),
             'water_windows_nm': tuple(tuple(map(float, w)) for w in (self.water_windows if water_windows is None else water_windows)),
-        }
+        })
 
-        # Datasets “coord-like” para fácil lectura con xarray
-        root.create_dataset('band', data=np.arange(B_out, dtype=np.int32))
-        if add_coords:
-            if self.wavelengths is not None:
-                root.create_dataset('wavelength', data=self.wavelengths[valid_bands].astype('float32'))
-            if (self.fwhm is not None) and (self.wavelengths is not None) and (len(self.fwhm) == len(self.wavelengths)):
-                root.create_dataset('fwhm', data=self.fwhm[valid_bands].astype('float32'))
+        # 6) Arrays "coord-like"
+        #    Usamos create_array + asignación por consistencia entre versiones.
+        print('[INFO] Agregando arrays de coordenadas...')
+        root.create_array('band', shape=(B_out,), chunks=(min(B_out, max(1, chunks[0])),), dtype='int32')[:] = np.arange(B_out, dtype=np.int32)
+        if add_coords and (self.wavelengths is not None):
+            wl_valid = self.wavelengths[valid_bands].astype('float32')
+            root.create_array('wavelength', shape=wl_valid.shape, chunks=(wl_valid.shape[0],), dtype='float32')[:] = wl_valid
+            if (self.fwhm is not None) and (len(self.fwhm) == len(self.wavelengths)):
+                fw_valid = self.fwhm[valid_bands].astype('float32')
+                root.create_array('fwhm', shape=fw_valid.shape, chunks=(fw_valid.shape[0],), dtype='float32')[:] = fw_valid
 
-        # (Opcional) añadir NDVI y veg_mask en una segunda pasada con xarray
+        # 7) NDVI + veg_mask (opcional)
+        print('[INFO] Agregando NDVI y veg_mask (opcional)...')
         if add_ndvi and (self.wavelengths is not None):
+            # Buscar bandas cercanas dentro de lo exportado
+            wl_export = self.wavelengths[valid_bands]
+            def nb(target):
+                return int(np.nanargmin(np.abs(wl_export - float(target))))
             try:
-                ds = xr.open_zarr(zarr_path)
-                da = ds['reflectance']  # (band,y,x)
+                b_red = nb(660.0)
+                b_nir = nb(800.0)
 
-                wl_valid = ds['wavelength'].values if 'wavelength' in ds.variables else None
-                if wl_valid is not None:
-                    # bandas más cercanas a 660nm y 800nm
-                    def nb(target):
-                        return int(np.nanargmin(np.abs(wl_valid - float(target))))
-                    b_red = nb(660.0)
-                    b_nir = nb(800.0)
+                RED = arr_reflect[b_red, :, :].astype(np.float32)
+                NIR = arr_reflect[b_nir, :, :].astype(np.float32)
+                NDVI = (NIR - RED) / (NIR + RED + 1e-6)
+                veg_mask = (NDVI > float(ndvi_threshold)) & np.isfinite(NDVI)
 
-                    RED = da.isel(band=b_red).values
-                    NIR = da.isel(band=b_nir).values
-                    NDVI = (NIR - RED) / (NIR + RED + 1e-6)
-                    veg_mask = (NDVI > float(ndvi_threshold)) & np.isfinite(NDVI)
+                # Chunks espaciales para 2D
+                yx_chunks = (chunks[1], chunks[2]) if len(chunks) == 3 else None
 
-                    ds2 = xr.Dataset({
-                        'reflectance': da,
-                        'NDVI': xr.DataArray(NDVI.astype('float32'), dims=('y', 'x')),
-                        'veg_mask': xr.DataArray(veg_mask.astype('uint8'), dims=('y', 'x'),
-                                                 attrs={'0': 'no-veg', '1': 'veg'})
-                    })
-                    # Mantener chunks razonables
-                    ds2 = ds2.chunk({'band': da.chunks[0][0] if da.chunks else 64, 'y': 512, 'x': 512})
-                    ds2.to_zarr(zarr_path, mode='w')
+                root.create_array('NDVI', shape=(H, W), chunks=yx_chunks, dtype='float32')[:] = NDVI.astype('float32')
+                vm = root.create_array('veg_mask', shape=(H, W), chunks=yx_chunks, dtype='uint8')
+                vm[:] = veg_mask.astype('uint8')
+                vm.attrs.update({'0': 'no-veg', '1': 'veg'})
             except Exception as e:
                 print(f"[WARN] NDVI/veg_mask no agregados: {e}")
 
@@ -262,6 +325,7 @@ class HypercubeProcessor:
         if self.wavelengths is not None:
             wl_exp = self.wavelengths[valid_bands]
             print(f"    Rango λ exportado: {float(np.nanmin(wl_exp)):.1f}–{float(np.nanmax(wl_exp)):.1f} nm")
+
 
     def nearest_band(self, target_nm: float) -> int:
         assert self.wavelengths is not None, "No hay wavelengths."
