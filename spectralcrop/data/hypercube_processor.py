@@ -389,8 +389,6 @@ class HypercubeProcessor:
 
                     pwrap.update(1)
 
-
-
     def save_reflectance_to_zarr_fast(self,
                                     zarr_path: str,
                                     exclude_water: bool = True,
@@ -412,22 +410,37 @@ class HypercubeProcessor:
         'spectral' (memmap ENVI) y cálculo por bloques de bandas y/o tiles espaciales.
 
         - strategy="bands": bloques de k bandas sobre toda la escena.
-        - strategy="tiled": tiles espaciales (Ty,Tx) × bloques de k bandas (recomendado si chunks=(...,512,512)).
-        - resume=True: usa un vector 'written_bands' para saltar bandas ya escritas.
-        - atomic_swap=True: escribe en zarr_path+'.tmp' y renombra a zarr_path al final (consistencia atómica).
+        - strategy="tiled": tiles (Ty,Tx) × grupos chunk-aware en C (recomendado si chunks=(...,512,512)).
+        - resume=True: usa 'written_bands' para saltar escrituras.
+        - atomic_swap=True: escribe en zarr_path+'.tmp' y renombra al final (consistencia atómica).
 
-        Requiere: self.cube (memmap) con shape (H, W, B).
+        Además añade metadatos de dimensiones requeridos por xarray:
+        - reflectance: ['band', 'y', 'x']
+        - band, wavelength, fwhm, written_bands: ['band']
+        - NDVI, veg_mask: ['y', 'x']
         """
         import os
         import shutil
         import numpy as np
         import zarr
 
+        print('[INFO] Iniciando guardado acelerado de reflectancia en Zarr...')
+
         # tqdm (opcional)
         try:
             from tqdm import tqdm
         except Exception:
             tqdm = None
+
+        # Helper local para setear atributos de dimensiones (xarray-friendly)
+        def _set_dim_attrs(zarr_array, dims):
+            try:
+                zarr_array.attrs['dimension_names'] = list(dims)
+                zarr_array.attrs['_ARRAY_DIMENSIONS'] = list(dims)
+            except Exception:
+                # En caso de Zarr v2/v3 sin soporte de attrs.put directamente
+                zarr_array.attrs.update({'dimension_names': list(dims),
+                                        '_ARRAY_DIMENSIONS': list(dims)})
 
         # Validaciones básicas
         H, W, Bm = self.cube.shape
@@ -454,52 +467,57 @@ class HypercubeProcessor:
         tmp_path = None
         if atomic_swap:
             tmp_path = zarr_path + ".tmp"
-            # Limpia solo la temporal
+            # Limpiar solo la temporal
             if os.path.isdir(tmp_path):
                 shutil.rmtree(tmp_path)
-            # El 'resume' no aplica con atomic_swap: escribimos limpio
-            # (se podría implementar 'resume' contra .tmp, pero lo mantenemos simple)
+            # Con atomic swap escribimos limpio
             resume = False
             target_path = tmp_path
 
-        # 2) Abrir grup
+        # 2) Abrir/crear grupo
         print("[INFO] Abriendo/creando Zarr group...")
         if resume:
-            # Modo append: no borra; intentará reanudar
+            # modo append
             root = zarr.open_group(target_path, mode='a')
         else:
-            # Modo overwrite: crea de cero
+            # overwrite limpio
             if os.path.isdir(target_path):
                 shutil.rmtree(target_path)
-            root = zarr.open_group(target_path, mode='w')   # Recomendado por la guía de grupos
-            # https://zarr.readthedocs.io/en/stable/user-guide/groups.html
+            root = zarr.open_group(target_path, mode='w')  # Guía oficial: abrir grupo por ruta
 
-        # 3) Crear array reflectance si no existe
+        # 3) Crear/obtener array 'reflectance'
         print("[INFO] Preparando array 'reflectance'...")
         if 'reflectance' in root:
             arr_reflect = root['reflectance']
             if arr_reflect.shape != (B_out, H, W):
                 raise ValueError(f"'reflectance' existente con shape {arr_reflect.shape}, esperado {(B_out, H, W)}")
+            # Asegurar metadatos de dimensiones (por si faltaban)
+            _set_dim_attrs(arr_reflect, ['band', 'y', 'x'])
         else:
             arr_reflect = root.create_array(
                 name='reflectance',
                 shape=(B_out, H, W),
                 chunks=chunks,
                 dtype='float32'
-            )  # https://zarr.readthedocs.io/en/stable/user-guide/arrays.html
+            )
+            _set_dim_attrs(arr_reflect, ['band', 'y', 'x'])
 
-        # 4) written_bands para reanudar
+        # 4) 'written_bands' (control de resume)
         print("[INFO] Preparando control de bandas escritas...")
         if resume:
             if 'written_bands' not in root:
-                wb = root.create_array('written_bands', shape=(B_out,), chunks=(min(B_out, 1024),), dtype='uint8')
+                wb = root.create_array('written_bands', shape=(B_out,),
+                                    chunks=(min(B_out, 1024),), dtype='uint8')
                 wb[:] = 0
+                _set_dim_attrs(wb, ['band'])
             else:
                 wb = root['written_bands']
+                # Dim attrs por si faltaban
+                _set_dim_attrs(wb, ['band'])
         else:
-            # crear/actualizar metadatos y coords
+            # Metadatos del grupo (attrs raíz)
             root.attrs.put({
-                'description': 'Reflectance cube (raw) without Savitzky–Golay',
+                'description': 'Reflectance cube (raw)',
                 'units': 'unitless',
                 'scale_applied': float(self.scale),
                 'clip_applied': '[0,1.2]',
@@ -507,33 +525,48 @@ class HypercubeProcessor:
                 'exclude_water_windows': bool(exclude_water),
                 'water_windows_nm': tuple(tuple(map(float, w)) for w in (self.water_windows if water_windows is None else water_windows)),
             })
-            root.create_array('band', shape=(B_out,), chunks=(min(B_out, 1024),), dtype='int32')[:] = np.arange(B_out, dtype=np.int32)
+            # Coordenadas/índices
+            arr_band = root.create_array('band', shape=(B_out,),
+                                        chunks=(min(B_out, 1024),), dtype='int32')
+            arr_band[:] = np.arange(B_out, dtype=np.int32)
+            _set_dim_attrs(arr_band, ['band'])
+
             if add_coords and (self.wavelengths is not None):
                 wl_valid = self.wavelengths[valid_bands].astype('float32')
-                root.create_array('wavelength', shape=wl_valid.shape, chunks=(wl_valid.shape[0],), dtype='float32')[:] = wl_valid
+                arr_wl = root.create_array('wavelength', shape=wl_valid.shape,
+                                        chunks=(wl_valid.shape[0],), dtype='float32')
+                arr_wl[:] = wl_valid
+                _set_dim_attrs(arr_wl, ['band'])
+
                 if (self.fwhm is not None) and (len(self.fwhm) == len(self.wavelengths)):
                     fw_valid = self.fwhm[valid_bands].astype('float32')
-                    root.create_array('fwhm', shape=fw_valid.shape, chunks=(fw_valid.shape[0],), dtype='float32')[:] = fw_valid
-            # vector de control
-            wb = root.create_array('written_bands', shape=(B_out,), chunks=(min(B_out, 1024),), dtype='uint8')
-            wb[:] = 0
+                    arr_fw = root.create_array('fwhm', shape=fw_valid.shape,
+                                            chunks=(fw_valid.shape[0],), dtype='float32')
+                    arr_fw[:] = fw_valid
+                    _set_dim_attrs(arr_fw, ['band'])
 
-        # 5) Orden de salida y bandas pendientes (si resume)
+            # Vector de control
+            wb = root.create_array('written_bands', shape=(B_out,),
+                                chunks=(min(B_out, 1024),), dtype='uint8')
+            wb[:] = 0
+            _set_dim_attrs(wb, ['band'])
+
+        # 5) Pendientes (si resume)
         print("[INFO] Preparando lista de bandas pendientes...")
         out_index = {int(b): i for i, b in enumerate(valid_bands)}
         pending_bands = [b for b in valid_bands if (not resume) or (wb[out_index[b]] == 0)]
 
         # 6) Escritura acelerada
         print("[INFO] Iniciando escritura acelerada de reflectancia...")
-        print(f"[INFO] Estrategia: {strategy}  | band_block={band_block}  | tile={tile if strategy=='tiled' else 'N/A'}")
+        print(f"[INFO] Estrategia: {strategy} | band_block={band_block} | tile={tile if strategy=='tiled' else 'N/A'}")
+
         if tqdm is not None:
             if strategy == "bands":
-                pbar = tqdm(total=(len([b for b in pending_bands]) + band_block - 1)//band_block, desc="Batches(bands)")
-                # wrapper simple para cumplir con API del helper
+                pbar = tqdm(total=(len([b for b in pending_bands]) + band_block - 1)//band_block,
+                            desc="Batches(bands)")
                 def _progress(it, total=None, desc=None):
-                    return it  # manejamos pbar fuera
+                    return it  # barra manejada fuera
             else:
-                # en modo tiled, el helper avanza internamente
                 pbar = None
                 _progress = None
         else:
@@ -541,13 +574,10 @@ class HypercubeProcessor:
             _progress = None
 
         if strategy == "bands":
-            # Reordenar 'valid_bands' según pendientes (preserva el orden relativo)
-            work = [int(b) for b in pending_bands]
-            # Relleno de agua y escritura por bloques
-            # Creamos una vista temporal de 'valid_bands' para el helper (que espera todas)
+            # NOTA: esta rama no es chunk-aware; úsala si no te daba problemas en Windows.
             self._write_reflectance_blockwise_bands(
                 arr_reflect=arr_reflect,
-                valid_bands=valid_bands,  # usa este para indexación out_index consistente
+                valid_bands=valid_bands,
                 water_windows=water_windows,
                 clip=(0.0, 1.2),
                 band_block=band_block,
@@ -556,22 +586,26 @@ class HypercubeProcessor:
             if pbar is not None:
                 pbar.close()
         elif strategy == "tiled":
-            # --- estrategia chunk-aware + tiled ---
+            # Estrategia CHUNK-AWARE + TILEADO: evita colisiones de .partial en Windows
             if tqdm is not None:
-                from tqdm import tqdm
                 Ty, Tx = tile
                 tiles_y = (H + Ty - 1) // Ty
                 tiles_x = (W + Tx - 1) // Tx
                 c_chunk = arr_reflect.chunks[0]
                 total_steps = tiles_y * tiles_x * ((len(valid_bands) + c_chunk - 1) // c_chunk)
                 pbar = tqdm(total=total_steps, desc="Tiles×C-chunks")
+
+                class _Prog:
+                    def __init__(self, bar): self.bar = bar
+                    def update(self, n=1): self.bar.update(n)
+
                 self._write_reflectance_chunkwise_tiled(
                     arr_reflect=arr_reflect,
                     valid_bands=valid_bands,
                     water_windows=water_windows,
                     clip=(0.0, 1.2),
                     tile=tile,
-                    progress=pbar
+                    progress=_Prog(pbar)
                 )
                 pbar.close()
             else:
@@ -586,7 +620,7 @@ class HypercubeProcessor:
         else:
             raise ValueError("strategy debe ser 'bands' o 'tiled'.")
 
-        # 7) Marcar bandas como escritas (todas las válidas)
+        # 7) Marcar bandas como escritas
         print("[INFO] Marcando bandas como escritas...")
         wb[:] = 1
 
@@ -596,7 +630,6 @@ class HypercubeProcessor:
             wl_export = root['wavelength'][:]
             def nb(target):
                 return int(np.nanargmin(np.abs(wl_export - float(target))))
-
             try:
                 i_red = nb(660.0)
                 i_nir = nb(800.0)
@@ -606,12 +639,20 @@ class HypercubeProcessor:
                 veg_mask = (NDVI > float(ndvi_threshold)) & np.isfinite(NDVI)
 
                 yx_chunks = (chunks[1], chunks[2]) if len(chunks) == 3 else None
+
                 if 'NDVI' in root: del root['NDVI']
                 if 'veg_mask' in root: del root['veg_mask']
-                root.create_array('NDVI', shape=(H, W), chunks=yx_chunks, dtype='float32')[:] = NDVI.astype('float32')
-                vm = root.create_array('veg_mask', shape=(H, W), chunks=yx_chunks, dtype='uint8')
+
+                arr_ndvi = root.create_array('NDVI', shape=(H, W),
+                                            chunks=yx_chunks, dtype='float32')
+                arr_ndvi[:] = NDVI.astype('float32')
+                _set_dim_attrs(arr_ndvi, ['y', 'x'])
+
+                vm = root.create_array('veg_mask', shape=(H, W),
+                                    chunks=yx_chunks, dtype='uint8')
                 vm[:] = veg_mask.astype('uint8')
                 vm.attrs.update({'0': 'no-veg', '1': 'veg'})
+                _set_dim_attrs(vm, ['y', 'x'])
             except Exception as e:
                 print(f"[WARN] NDVI/veg_mask no agregados: {e}")
 
@@ -629,8 +670,6 @@ class HypercubeProcessor:
         if self.wavelengths is not None:
             wl_exp = self.wavelengths[valid_bands]
             print(f"    Rango λ exportado: {float(np.nanmin(wl_exp)):.1f}–{float(np.nanmax(wl_exp)):.1f} nm")
-
-
 
 
 
