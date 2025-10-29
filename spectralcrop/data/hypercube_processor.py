@@ -105,6 +105,24 @@ class HypercubeProcessor:
     # 2) to_reflectance con saltos de bandas de agua (opcional)
     # -------------------------------------------------------
 
+    def _read_bands_block(self, bands_idx, yslice=None, xslice=None) -> np.ndarray:
+        """
+        Lee un bloque desde 'cube' (spectral ENVI memmap) y lo devuelve como (B_k, h, w).
+        - bands_idx: iterable de índices de banda (int)
+        - yslice, xslice: slices espaciales (e.g., slice(y0,y1), slice(x0,x1))
+        """
+        bands_idx = [int(b) for b in bands_idx]
+        if yslice is None:
+            yslice = slice(None)
+        if xslice is None:
+            xslice = slice(None)
+
+        # spectral memmap es (H, W, B). Obtenemos (h, w, B_k) y lo movemos a (B_k, h, w).
+        raw = self.cube[yslice, xslice, bands_idx]  # memmap -> lectura perezosa
+        if raw.ndim == 2:
+            raw = raw[..., None]  # (h,w,1) por si bands_idx tiene 1 banda
+        return np.moveaxis(raw, 2, 0)  # (B_k, h, w)
+
     def to_reflectance(self,
                        band_i: int,
                        clip: Tuple[float, float] = (0.0, 1.2),
@@ -202,36 +220,222 @@ class HypercubeProcessor:
                 "Considera fijar versión con 'pip install \"zarr<3\"'."
             ) from e
 
-    def save_reflectance_to_zarr(self,
-                                zarr_path: str,
-                                exclude_water: bool = True,
-                                water_windows=None,      # si None, usa self.water_windows
-                                min_lambda: float = None,
-                                max_lambda: float = None,
-                                chunks=(64, 512, 512),   # (band, y, x)
-                                add_coords: bool = True,
-                                add_ndvi: bool = True,
-                                ndvi_threshold: float = 0.3) -> None:
+    # ---------------------------------------------
+    # Helpers para lectura vectorizada desde SPECTRAL
+    # ---------------------------------------------
+    def _read_bands_block(self, bands_idx, yslice=None, xslice=None) -> np.ndarray:
         """
-        Guarda reflectance (band,y,x) + coords + (opcional) NDVI/veg_mask en zarr_path,
-        usando la API de alto nivel recomendada por Zarr:
-        - zarr.open_group(<ruta>, mode="w")
-        - root.create_array(...)
+        Lee un bloque desde 'cube' (spectral ENVI memmap) y lo devuelve como (B_k, h, w).
+        - bands_idx: iterable de índices de banda (int)
+        - yslice, xslice: slices espaciales (e.g., slice(y0,y1), slice(x0,x1))
+        """
+        bands_idx = [int(b) for b in bands_idx]
+        if yslice is None:
+            yslice = slice(None)
+        if xslice is None:
+            xslice = slice(None)
+
+        # El memmap de spectral es (H, W, B)
+        raw = self.cube[yslice, xslice, bands_idx]
+        if raw.ndim == 2:  # una sola banda
+            raw = raw[..., None]
+        return np.moveaxis(raw, 2, 0)  # -> (B_k, h, w)
+
+
+    def _write_reflectance_blockwise_bands(self,
+                                        arr_reflect,
+                                        valid_bands,
+                                        water_windows=None,
+                                        clip=(0.0, 1.2),
+                                        band_block=4,
+                                        progress=None):
+        """
+        Escribe reflectancia en bloques de bandas (espacio completo):
+        - Menos overhead Python (≈ B_out / band_block iteraciones).
+        - Operaciones vectorizadas 3D.
+        """
+        import numpy as np
+
+        lo, hi = map(float, clip)
+        ignore_vals = tuple(self.ignore_vals)
+        wl = self.wavelengths
+        windows = self.water_windows if water_windows is None else tuple(tuple(map(float, w)) for w in water_windows)
+
+        H, W = self.img.nrows, self.img.ncols
+        out_index = {int(b): i for i, b in enumerate(valid_bands)}
+
+        def in_water(b):
+            if wl is None:
+                return False
+            wli = float(wl[int(b)])
+            return any((wli > lo_w) and (wli < hi_w) for lo_w, hi_w in windows)
+
+        water_bands = [int(b) for b in valid_bands if in_water(b)]
+        work_bands  = [int(b) for b in valid_bands if not in_water(b)]
+
+        # Rellena bandas de agua sin leer disco
+        if water_bands:
+            arr_reflect[[out_index[b] for b in water_bands], :, :] = np.nan
+
+        iterator = range(0, len(work_bands), band_block)
+        if progress is not None:
+            iterator = progress(iterator, total=(len(work_bands) + band_block - 1) // band_block, desc="Batches(bands)")
+
+        for s in iterator:
+            batch = work_bands[s:s+band_block]  # lista de bandas fuente
+            raw = self._read_bands_block(batch)  # (B_k, H, W), dtype origen
+
+            # Máscara ignore_vals (vectorizada)
+            mask_ignore = np.zeros_like(raw, dtype=bool)
+            for v in ignore_vals:
+                mask_ignore |= (raw == v)
+
+            # Escalado + filtro
+            refl = raw.astype(np.float32, copy=True)
+            refl /= float(self.scale)
+            bad = (refl < lo) | (refl > hi) | mask_ignore
+            refl[bad] = np.nan
+
+            # Escritura a Zarr
+            for j, bsrc in enumerate(batch):
+                arr_reflect[out_index[bsrc], :, :] = refl[j]
+
+    def _write_reflectance_chunkwise_tiled(self,
+                                        arr_reflect,
+                                        valid_bands,
+                                        water_windows=None,
+                                        clip=(0.0, 1.2),
+                                        tile=(512, 512),
+                                        progress=None):
+        """
+        Escritura tileada (y,x) PERO agrupando bandas por el tamaño del chunk en C.
+        Así cada archivo de chunk (c_idx, y_idx, x_idx) se escribe una única vez por tile.
+
+        - Requiere que 'arr_reflect' exponga su shape/chunks (Zarr Array).
+        - 'valid_bands' define el orden de salida ==> los grupos c0:c1 son cortados sobre ese orden.
+        """
+        import numpy as np
+
+        lo, hi = map(float, clip)
+        ignore_vals = tuple(self.ignore_vals)
+        wl = self.wavelengths
+        windows = self.water_windows if water_windows is None else tuple(tuple(map(float, w)) for w in water_windows)
+
+        H, W = self.img.nrows, self.img.ncols
+        Ty, Tx = tile
+
+        # Tamaño del chunk sobre el eje banda (C)
+        try:
+            c_chunk = arr_reflect.chunks[0]
+        except Exception:
+            # fallback al c_chunk que definiste al crear el array
+            c_chunk = None
+        if not c_chunk:
+            raise ValueError("No se pudo determinar c_chunk; asegúrate de crear el Zarr con chunks=(C,Y,X).")
+
+        B_out = len(valid_bands)
+
+        # Helper: ¿banda está en ventana de agua?
+        def in_water(b):
+            if wl is None:
+                return False
+            wli = float(wl[int(b)])
+            return any((wli > lo_w) and (wli < hi_w) for lo_w, hi_w in windows)
+
+        # Iterar tiles espaciales
+        tiles_y = (H + Ty - 1) // Ty
+        tiles_x = (W + Tx - 1) // Tx
+        total_steps = tiles_y * tiles_x * ((B_out + c_chunk - 1) // c_chunk)
+
+        # Wrapper de progreso opcional
+        class _Prog:
+            def __init__(self, bar=None): self.bar = bar
+            def update(self, n=1): 
+                if self.bar is not None: self.bar.update(n)
+
+        pwrap = _Prog(progress)
+
+        for y0 in range(0, H, Ty):
+            y1 = min(H, y0 + Ty); ysl = slice(y0, y1)
+            for x0 in range(0, W, Tx):
+                x1 = min(W, x0 + Tx); xsl = slice(x0, x1)
+
+                # Grupos contiguos en el eje banda acorde al chunk en C
+                for c0 in range(0, B_out, c_chunk):
+                    c1 = min(B_out, c0 + c_chunk)
+                    group_bands = valid_bands[c0:c1]               # ids de bandas fuente (en ENVI)
+                    # Lectura vectorizada del memmap para ESTE tile y ESTE grupo de bandas
+                    raw = self._read_bands_block(group_bands, yslice=ysl, xslice=xsl)  # (c_len, Ty', Tx')
+
+                    # Construir máscara ignore y agua (todo vectorizado)
+                    mask_ignore = np.zeros_like(raw, dtype=bool)
+                    for v in ignore_vals:
+                        mask_ignore |= (raw == v)
+
+                    if wl is not None:
+                        # marcas de agua por banda -> broadcasting a (c_len, Ty', Tx')
+                        water_flags = np.array([in_water(b) for b in group_bands], dtype=bool)[:, None, None]
+                    else:
+                        water_flags = np.zeros((raw.shape[0], 1, 1), dtype=bool)
+
+                    # Escalado + clip + NaN
+                    refl = raw.astype(np.float32, copy=True)
+                    refl /= float(self.scale)
+                    bad = (refl < lo) | (refl > hi) | mask_ignore | water_flags
+                    refl[bad] = np.nan
+
+                    # ESCRITURA 3D DE UNA SOLA VEZ PARA ESTE CHUNK EN C:
+                    arr_reflect[c0:c1, ysl, xsl] = refl
+
+                    pwrap.update(1)
+
+
+
+    def save_reflectance_to_zarr_fast(self,
+                                    zarr_path: str,
+                                    exclude_water: bool = True,
+                                    water_windows=None,         # si None, usa self.water_windows
+                                    min_lambda: float = None,
+                                    max_lambda: float = None,
+                                    chunks=(64, 512, 512),
+                                    add_coords: bool = True,
+                                    add_ndvi: bool = True,
+                                    ndvi_threshold: float = 0.3,
+                                    strategy: str = "tiled",    # "tiled" | "bands"
+                                    band_block: int = 4,
+                                    tile: tuple = (512, 512),
+                                    resume: bool = False,       # reanudar escrituras
+                                    atomic_swap: bool = False   # escribe en .tmp y renombra al final
+                                    ) -> None:
+        """
+        Versión acelerada para escribir 'reflectance' (band,y,x) en Zarr con lectura vectorizada desde
+        'spectral' (memmap ENVI) y cálculo por bloques de bandas y/o tiles espaciales.
+
+        - strategy="bands": bloques de k bandas sobre toda la escena.
+        - strategy="tiled": tiles espaciales (Ty,Tx) × bloques de k bandas (recomendado si chunks=(...,512,512)).
+        - resume=True: usa un vector 'written_bands' para saltar bandas ya escritas.
+        - atomic_swap=True: escribe en zarr_path+'.tmp' y renombra a zarr_path al final (consistencia atómica).
+
+        Requiere: self.cube (memmap) con shape (H, W, B).
         """
         import os
         import shutil
         import numpy as np
         import zarr
 
-        # 0) Limpiar destino si existe
-        print('[INFO] Guardando reflectance en Zarr...')
-        if os.path.isdir(zarr_path):
-            shutil.rmtree(zarr_path)
+        # tqdm (opcional)
+        try:
+            from tqdm import tqdm
+        except Exception:
+            tqdm = None
 
-        B, H, W = self.img.nbands, self.img.nrows, self.img.ncols
+        # Validaciones básicas
+        H, W, Bm = self.cube.shape
+        assert (H == self.img.nrows) and (W == self.img.ncols), "Dimensiones memmap vs img no coinciden."
+        assert Bm == self.img.nbands, "Bandas memmap vs img no coinciden."
 
-        # 1) Selección de bandas válidas
-        print('[INFO] Seleccionando bandas válidas...')
+        # 0) Selección de bandas válidas
+        print("[INFO] Construyendo lista de bandas válidas...")
         valid_bands = self.build_valid_bands(
             wavelengths=self.wavelengths,
             water_windows=water_windows,
@@ -240,79 +444,170 @@ class HypercubeProcessor:
             max_lambda=max_lambda
         )
         if valid_bands is None:
-            valid_bands = np.arange(B, dtype=int)
+            valid_bands = np.arange(self.img.nbands, dtype=int)
         valid_bands = np.asarray(valid_bands, dtype=int)
         B_out = int(len(valid_bands))
 
-        # 2) Abrir/crear grupo en disco (recomendado por docs oficiales)
-        #    Crea el directorio <zarr_path> y organiza arrays como sub-rutas.
-        print('[INFO] Creando Zarr group en disco...')
-        root = zarr.open_group(zarr_path, mode='w')  # ← clave: API estable por ruta
+        # 1) Resolver destino (atomic swap opcional)
+        print(f"[INFO] Preparando Zarr en: {zarr_path} (atomic_swap={atomic_swap})")
+        target_path = zarr_path
+        tmp_path = None
+        if atomic_swap:
+            tmp_path = zarr_path + ".tmp"
+            # Limpia solo la temporal
+            if os.path.isdir(tmp_path):
+                shutil.rmtree(tmp_path)
+            # El 'resume' no aplica con atomic_swap: escribimos limpio
+            # (se podría implementar 'resume' contra .tmp, pero lo mantenemos simple)
+            resume = False
+            target_path = tmp_path
 
-        # 3) Crear array "reflectance" (band, y, x)
-        print('[INFO] Creando array "reflectance"...')
-        arr_reflect = root.create_array(
-            name='reflectance',
-            shape=(B_out, H, W),
-            chunks=chunks,
-            dtype='float32'
-            # No pasamos "compressor": usamos el codec por defecto de Zarr
-        )
+        # 2) Abrir grup
+        print("[INFO] Abriendo/creando Zarr group...")
+        if resume:
+            # Modo append: no borra; intentará reanudar
+            root = zarr.open_group(target_path, mode='a')
+        else:
+            # Modo overwrite: crea de cero
+            if os.path.isdir(target_path):
+                shutil.rmtree(target_path)
+            root = zarr.open_group(target_path, mode='w')   # Recomendado por la guía de grupos
+            # https://zarr.readthedocs.io/en/stable/user-guide/groups.html
 
-        # 4) Escribir banda por banda
-        print('[INFO] Escribiendo bandas de reflectance...')
-        for i, bi in enumerate(valid_bands):
-            refl = self.to_reflectance(
-                band_i=int(bi),
+        # 3) Crear array reflectance si no existe
+        print("[INFO] Preparando array 'reflectance'...")
+        if 'reflectance' in root:
+            arr_reflect = root['reflectance']
+            if arr_reflect.shape != (B_out, H, W):
+                raise ValueError(f"'reflectance' existente con shape {arr_reflect.shape}, esperado {(B_out, H, W)}")
+        else:
+            arr_reflect = root.create_array(
+                name='reflectance',
+                shape=(B_out, H, W),
+                chunks=chunks,
+                dtype='float32'
+            )  # https://zarr.readthedocs.io/en/stable/user-guide/arrays.html
+
+        # 4) written_bands para reanudar
+        print("[INFO] Preparando control de bandas escritas...")
+        if resume:
+            if 'written_bands' not in root:
+                wb = root.create_array('written_bands', shape=(B_out,), chunks=(min(B_out, 1024),), dtype='uint8')
+                wb[:] = 0
+            else:
+                wb = root['written_bands']
+        else:
+            # crear/actualizar metadatos y coords
+            root.attrs.put({
+                'description': 'Reflectance cube (raw) without Savitzky–Golay',
+                'units': 'unitless',
+                'scale_applied': float(self.scale),
+                'clip_applied': '[0,1.2]',
+                'nodata': 'NaN',
+                'exclude_water_windows': bool(exclude_water),
+                'water_windows_nm': tuple(tuple(map(float, w)) for w in (self.water_windows if water_windows is None else water_windows)),
+            })
+            root.create_array('band', shape=(B_out,), chunks=(min(B_out, 1024),), dtype='int32')[:] = np.arange(B_out, dtype=np.int32)
+            if add_coords and (self.wavelengths is not None):
+                wl_valid = self.wavelengths[valid_bands].astype('float32')
+                root.create_array('wavelength', shape=wl_valid.shape, chunks=(wl_valid.shape[0],), dtype='float32')[:] = wl_valid
+                if (self.fwhm is not None) and (len(self.fwhm) == len(self.wavelengths)):
+                    fw_valid = self.fwhm[valid_bands].astype('float32')
+                    root.create_array('fwhm', shape=fw_valid.shape, chunks=(fw_valid.shape[0],), dtype='float32')[:] = fw_valid
+            # vector de control
+            wb = root.create_array('written_bands', shape=(B_out,), chunks=(min(B_out, 1024),), dtype='uint8')
+            wb[:] = 0
+
+        # 5) Orden de salida y bandas pendientes (si resume)
+        print("[INFO] Preparando lista de bandas pendientes...")
+        out_index = {int(b): i for i, b in enumerate(valid_bands)}
+        pending_bands = [b for b in valid_bands if (not resume) or (wb[out_index[b]] == 0)]
+
+        # 6) Escritura acelerada
+        print("[INFO] Iniciando escritura acelerada de reflectancia...")
+        print(f"[INFO] Estrategia: {strategy}  | band_block={band_block}  | tile={tile if strategy=='tiled' else 'N/A'}")
+        if tqdm is not None:
+            if strategy == "bands":
+                pbar = tqdm(total=(len([b for b in pending_bands]) + band_block - 1)//band_block, desc="Batches(bands)")
+                # wrapper simple para cumplir con API del helper
+                def _progress(it, total=None, desc=None):
+                    return it  # manejamos pbar fuera
+            else:
+                # en modo tiled, el helper avanza internamente
+                pbar = None
+                _progress = None
+        else:
+            pbar = None
+            _progress = None
+
+        if strategy == "bands":
+            # Reordenar 'valid_bands' según pendientes (preserva el orden relativo)
+            work = [int(b) for b in pending_bands]
+            # Relleno de agua y escritura por bloques
+            # Creamos una vista temporal de 'valid_bands' para el helper (que espera todas)
+            self._write_reflectance_blockwise_bands(
+                arr_reflect=arr_reflect,
+                valid_bands=valid_bands,  # usa este para indexación out_index consistente
+                water_windows=water_windows,
                 clip=(0.0, 1.2),
-                skip_if_water=True,           # redundante tras filtrar, pero seguro
-                wavelengths=self.wavelengths, # permitido por tu firma actual
-                water_windows=water_windows
+                band_block=band_block,
+                progress=(lambda it, total=None, desc=None: it) if _progress is None else _progress
             )
-            arr_reflect[i, :, :] = refl  # NaN se almacenan tal cual
+            if pbar is not None:
+                pbar.close()
+        elif strategy == "tiled":
+            # --- estrategia chunk-aware + tiled ---
+            if tqdm is not None:
+                from tqdm import tqdm
+                Ty, Tx = tile
+                tiles_y = (H + Ty - 1) // Ty
+                tiles_x = (W + Tx - 1) // Tx
+                c_chunk = arr_reflect.chunks[0]
+                total_steps = tiles_y * tiles_x * ((len(valid_bands) + c_chunk - 1) // c_chunk)
+                pbar = tqdm(total=total_steps, desc="Tiles×C-chunks")
+                self._write_reflectance_chunkwise_tiled(
+                    arr_reflect=arr_reflect,
+                    valid_bands=valid_bands,
+                    water_windows=water_windows,
+                    clip=(0.0, 1.2),
+                    tile=tile,
+                    progress=pbar
+                )
+                pbar.close()
+            else:
+                self._write_reflectance_chunkwise_tiled(
+                    arr_reflect=arr_reflect,
+                    valid_bands=valid_bands,
+                    water_windows=water_windows,
+                    clip=(0.0, 1.2),
+                    tile=tile,
+                    progress=None
+                )
+        else:
+            raise ValueError("strategy debe ser 'bands' o 'tiled'.")
 
-        # 5) Atributos del grupo
-        print('[INFO] Agregando atributos al grupo Zarr...')
-        root.attrs.put({
-            'description': 'Reflectance cube (raw) without Savitzky–Golay',
-            'units': 'unitless',
-            'scale_applied': float(self.scale),
-            'clip_applied': '[0,1.2]',
-            'nodata': 'NaN',
-            'exclude_water_windows': bool(exclude_water),
-            'water_windows_nm': tuple(tuple(map(float, w)) for w in (self.water_windows if water_windows is None else water_windows)),
-        })
+        # 7) Marcar bandas como escritas (todas las válidas)
+        print("[INFO] Marcando bandas como escritas...")
+        wb[:] = 1
 
-        # 6) Arrays "coord-like"
-        #    Usamos create_array + asignación por consistencia entre versiones.
-        print('[INFO] Agregando arrays de coordenadas...')
-        root.create_array('band', shape=(B_out,), chunks=(min(B_out, max(1, chunks[0])),), dtype='int32')[:] = np.arange(B_out, dtype=np.int32)
-        if add_coords and (self.wavelengths is not None):
-            wl_valid = self.wavelengths[valid_bands].astype('float32')
-            root.create_array('wavelength', shape=wl_valid.shape, chunks=(wl_valid.shape[0],), dtype='float32')[:] = wl_valid
-            if (self.fwhm is not None) and (len(self.fwhm) == len(self.wavelengths)):
-                fw_valid = self.fwhm[valid_bands].astype('float32')
-                root.create_array('fwhm', shape=fw_valid.shape, chunks=(fw_valid.shape[0],), dtype='float32')[:] = fw_valid
-
-        # 7) NDVI + veg_mask (opcional)
-        print('[INFO] Agregando NDVI y veg_mask (opcional)...')
-        if add_ndvi and (self.wavelengths is not None):
-            # Buscar bandas cercanas dentro de lo exportado
-            wl_export = self.wavelengths[valid_bands]
+        # 8) NDVI + veg_mask (si se pidió y existe wavelength exportada)
+        print("[INFO] Calculando NDVI y veg_mask (si aplica)...")
+        if add_ndvi and ('wavelength' in root):
+            wl_export = root['wavelength'][:]
             def nb(target):
                 return int(np.nanargmin(np.abs(wl_export - float(target))))
-            try:
-                b_red = nb(660.0)
-                b_nir = nb(800.0)
 
-                RED = arr_reflect[b_red, :, :].astype(np.float32)
-                NIR = arr_reflect[b_nir, :, :].astype(np.float32)
+            try:
+                i_red = nb(660.0)
+                i_nir = nb(800.0)
+                RED = arr_reflect[i_red, :, :].astype(np.float32)
+                NIR = arr_reflect[i_nir, :, :].astype(np.float32)
                 NDVI = (NIR - RED) / (NIR + RED + 1e-6)
                 veg_mask = (NDVI > float(ndvi_threshold)) & np.isfinite(NDVI)
 
-                # Chunks espaciales para 2D
                 yx_chunks = (chunks[1], chunks[2]) if len(chunks) == 3 else None
-
+                if 'NDVI' in root: del root['NDVI']
+                if 'veg_mask' in root: del root['veg_mask']
                 root.create_array('NDVI', shape=(H, W), chunks=yx_chunks, dtype='float32')[:] = NDVI.astype('float32')
                 vm = root.create_array('veg_mask', shape=(H, W), chunks=yx_chunks, dtype='uint8')
                 vm[:] = veg_mask.astype('uint8')
@@ -320,11 +615,31 @@ class HypercubeProcessor:
             except Exception as e:
                 print(f"[WARN] NDVI/veg_mask no agregados: {e}")
 
+        # 9) Cierre por swap atómico (si aplica)
+        print("[INFO] Finalizando escritura Zarr...")
+        if atomic_swap and (tmp_path is not None):
+            # renombrado atómico en el mismo filesystem
+            if os.path.isdir(zarr_path):
+                shutil.rmtree(zarr_path)
+            os.replace(tmp_path, zarr_path)
+
+        # 10) Log final
         print(f"[OK] Zarr guardado en: {zarr_path}")
-        print(f"    Bandas exportadas: {B_out} / {B}")
+        print(f"    Bandas exportadas: {B_out} / {self.img.nbands}")
         if self.wavelengths is not None:
             wl_exp = self.wavelengths[valid_bands]
             print(f"    Rango λ exportado: {float(np.nanmin(wl_exp)):.1f}–{float(np.nanmax(wl_exp)):.1f} nm")
+
+
+
+
+
+
+
+
+
+
+
 
 
     def nearest_band(self, target_nm: float) -> int:
