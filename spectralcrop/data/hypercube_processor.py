@@ -494,22 +494,39 @@ class HypercubeProcessor:
             # Asegurar metadatos de dimensiones (por si faltaban)
             _set_dim_attrs(arr_reflect, ['band', 'y', 'x'])
         else:
-            arr_reflect = root.create_array(
-                name='reflectance',
-                shape=(B_out, H, W),
-                chunks=chunks,
-                dtype='float32'
-            )
-            _set_dim_attrs(arr_reflect, ['band', 'y', 'x'])
+            try:
+                arr_reflect = root.create_array(
+                    name='reflectance',
+                    shape=(B_out, H, W),
+                    chunks=chunks,
+                    dtype='float32',
+                    dimension_names=['band', 'y', 'x']
+                )
+                _set_dim_attrs(arr_reflect, ['band', 'y', 'x'])
+            except:
+                arr_reflect = root.create_array(
+                    name='reflectance',
+                    shape=(B_out, H, W),
+                    chunks=chunks,
+                    dtype='float32'
+                )
+                _set_dim_attrs(arr_reflect, ['band', 'y', 'x'])
 
         # 4) 'written_bands' (control de resume)
         print("[INFO] Preparando control de bandas escritas...")
         if resume:
             if 'written_bands' not in root:
-                wb = root.create_array('written_bands', shape=(B_out,),
-                                    chunks=(min(B_out, 1024),), dtype='uint8')
-                wb[:] = 0
-                _set_dim_attrs(wb, ['band'])
+                try:
+                    wb = root.create_array('written_bands', shape=(B_out,),
+                                        chunks=(min(B_out, 1024),), dtype='uint8',
+                                        dimension_names=['band'])
+                    wb[:] = 0
+                    _set_dim_attrs(wb, ['band'])
+                except:
+                    wb = root.create_array('written_bands', shape=(B_out,),
+                                        chunks=(min(B_out, 1024),), dtype='uint8')
+                    wb[:] = 0
+                    _set_dim_attrs(wb, ['band'])
             else:
                 wb = root['written_bands']
                 # Dim attrs por si faltaban
@@ -526,30 +543,59 @@ class HypercubeProcessor:
                 'water_windows_nm': tuple(tuple(map(float, w)) for w in (self.water_windows if water_windows is None else water_windows)),
             })
             # Coordenadas/índices
-            arr_band = root.create_array('band', shape=(B_out,),
-                                        chunks=(min(B_out, 1024),), dtype='int32')
-            arr_band[:] = np.arange(B_out, dtype=np.int32)
-            _set_dim_attrs(arr_band, ['band'])
+            try:
+                arr_band = root.create_array('band', shape=(B_out,),
+                                            chunks=(min(B_out, 1024),), dtype='int32',
+                                            dimension_names=['band'])
+                arr_band[:] = np.arange(B_out, dtype=np.int32)
+                _set_dim_attrs(arr_band, ['band'])
+            except:
+                arr_band = root.create_array('band', shape=(B_out,),
+                                            chunks=(min(B_out, 1024),), dtype='int32')
+                arr_band[:] = np.arange(B_out, dtype=np.int32)
+                _set_dim_attrs(arr_band, ['band'])
 
             if add_coords and (self.wavelengths is not None):
                 wl_valid = self.wavelengths[valid_bands].astype('float32')
-                arr_wl = root.create_array('wavelength', shape=wl_valid.shape,
-                                        chunks=(wl_valid.shape[0],), dtype='float32')
-                arr_wl[:] = wl_valid
-                _set_dim_attrs(arr_wl, ['band'])
+
+                try:
+                    arr_wl = root.create_array('wavelength', shape=wl_valid.shape,
+                                            chunks=(wl_valid.shape[0],), dtype='float32',
+                                            dimension_names=['band'])
+                    arr_wl[:] = wl_valid
+                    _set_dim_attrs(arr_wl, ['band'])
+                except:
+                    arr_wl = root.create_array('wavelength', shape=wl_valid.shape,
+                                            chunks=(wl_valid.shape[0],), dtype='float32')
+                    arr_wl[:] = wl_valid
+                    _set_dim_attrs(arr_wl, ['band'])
 
                 if (self.fwhm is not None) and (len(self.fwhm) == len(self.wavelengths)):
                     fw_valid = self.fwhm[valid_bands].astype('float32')
-                    arr_fw = root.create_array('fwhm', shape=fw_valid.shape,
-                                            chunks=(fw_valid.shape[0],), dtype='float32')
-                    arr_fw[:] = fw_valid
-                    _set_dim_attrs(arr_fw, ['band'])
+
+                    try:
+                        arr_fw = root.create_array('fwhm', shape=fw_valid.shape,
+                                                chunks=(fw_valid.shape[0],), dtype='float32',
+                                                dimension_names=['band'])
+                        arr_fw[:] = fw_valid
+                        _set_dim_attrs(arr_fw, ['band'])
+                    except:
+                        arr_fw = root.create_array('fwhm', shape=fw_valid.shape,
+                                                chunks=(fw_valid.shape[0],), dtype='float32')
+                        arr_fw[:] = fw_valid
+                        _set_dim_attrs(arr_fw, ['band'])
 
             # Vector de control
-            wb = root.create_array('written_bands', shape=(B_out,),
-                                chunks=(min(B_out, 1024),), dtype='uint8')
-            wb[:] = 0
-            _set_dim_attrs(wb, ['band'])
+            try:
+                wb = root.create_array('written_bands', shape=(B_out,),
+                                    chunks=(min(B_out, 1024),), dtype='uint8', dimension_names=['band'])
+                wb[:] = 0
+                _set_dim_attrs(wb, ['band'])
+            except:
+                wb = root.create_array('written_bands', shape=(B_out,),
+                                    chunks=(min(B_out, 1024),), dtype='uint8')
+                wb[:] = 0
+                _set_dim_attrs(wb, ['band'])
 
         # 5) Pendientes (si resume)
         print("[INFO] Preparando lista de bandas pendientes...")
@@ -643,16 +689,31 @@ class HypercubeProcessor:
                 if 'NDVI' in root: del root['NDVI']
                 if 'veg_mask' in root: del root['veg_mask']
 
-                arr_ndvi = root.create_array('NDVI', shape=(H, W),
-                                            chunks=yx_chunks, dtype='float32')
-                arr_ndvi[:] = NDVI.astype('float32')
-                _set_dim_attrs(arr_ndvi, ['y', 'x'])
-
-                vm = root.create_array('veg_mask', shape=(H, W),
-                                    chunks=yx_chunks, dtype='uint8')
-                vm[:] = veg_mask.astype('uint8')
-                vm.attrs.update({'0': 'no-veg', '1': 'veg'})
-                _set_dim_attrs(vm, ['y', 'x'])
+                try:
+                    arr_ndvi = root.create_array('NDVI', shape=(H, W),
+                                                chunks=yx_chunks, dtype='float32',
+                                                dimension_names=['y', 'x'])
+                    arr_ndvi[:] = NDVI.astype('float32')
+                    _set_dim_attrs(arr_ndvi, ['y', 'x'])
+                except:
+                    arr_ndvi = root.create_array('NDVI', shape=(H, W),
+                                                chunks=yx_chunks, dtype='float32')
+                    arr_ndvi[:] = NDVI.astype('float32')
+                    _set_dim_attrs(arr_ndvi, ['y', 'x'])
+                
+                try:
+                    vm = root.create_array('veg_mask', shape=(H, W),
+                                        chunks=yx_chunks, dtype='uint8',
+                                        dimension_names=['y', 'x'])
+                    vm[:] = veg_mask.astype('uint8')
+                    vm.attrs.update({'0': 'no-veg', '1': 'veg'})
+                    _set_dim_attrs(vm, ['y', 'x'])
+                except:
+                    vm = root.create_array('veg_mask', shape=(H, W),
+                                        chunks=yx_chunks, dtype='uint8')
+                    vm[:] = veg_mask.astype('uint8')
+                    vm.attrs.update({'0': 'no-veg', '1': 'veg'})
+                    _set_dim_attrs(vm, ['y', 'x'])
             except Exception as e:
                 print(f"[WARN] NDVI/veg_mask no agregados: {e}")
 
