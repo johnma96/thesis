@@ -48,4 +48,5 @@ rasterio==1.4.3
 spectral==0.24
 scipy==1.16.2
 dvc[s3,gdrive]==3.63.0
-scikit-learn
+scikit-learn==1.7.2
+dask==2025.10.0
