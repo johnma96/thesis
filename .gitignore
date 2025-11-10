@@ -218,3 +218,4 @@ models/mlruns/*
 
 # Data tracked with DVC
 data/raw/
+data/processed/zarr
