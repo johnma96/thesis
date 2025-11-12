@@ -1,6 +1,6 @@
 outs:
-- md5: db2cbad6431e84ab85306dcdcb97c0f3.dir
-  size: 4147678549
-  nfiles: 442
+- md5: 91efa78b1ff8452a44629d123e370927.dir
+  size: 4147881949
+  nfiles: 499
   hash: md5
   path: masked_reflectance.zarr
