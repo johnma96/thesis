@@ -1,5 +1,5 @@
 outs:
-- md5: 7fb37506a36df24f7d1306d7926b1189
-  size: 96766
+- md5: e6b2d1c8d430e79c439887181a560fd4
+  size: 104628
   hash: md5
   path: labels_multiclass.tif
