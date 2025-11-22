@@ -199,6 +199,8 @@ cython_debug/
 *.pdf
 !docs/model_architecture.png
 !reports/Propuesta Trabajo Final.pdf
+!references/theses/*.pdf
+!references/papers/*.pdf
 
 # Data files
 *.xlsx
