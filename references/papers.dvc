@@ -1,0 +1,6 @@
+outs:
+- md5: 034099b818a3db9050de9ab20fb5ce92.dir
+  size: 456450136
+  nfiles: 95
+  hash: md5
+  path: papers
