@@ -56,3 +56,5 @@ rioxarray==0.20.0
 zarr==3.1.5
 imbalanced-learn==0.14.0
 optuna==4.6.0
+mlflow==3.8.1
+dagshub==0.6.4
