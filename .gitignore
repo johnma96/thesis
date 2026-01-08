@@ -217,6 +217,7 @@ credentials/*.json
 # Experimental models mlflow
 models/mlruns/*
 !/models/mlruns/*.gitkeep
+models/*
 
 # Data tracked with DVC
 data/raw/
