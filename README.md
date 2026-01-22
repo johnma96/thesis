@@ -184,8 +184,13 @@ The required libraries are listed in the file [`requirements.txt`](/requirements
 
 ## License
 
-This project is released under the MIT License.
-See the LICENSE file for details.
+### Code
+The source code in this repository is licensed under the [MIT License](/LICENSE).
+
+### Data, Labels and Experimental Results
+All datasets, labels, trained models, figures, and experimental results are **NOT open**.
+They are protected under an ["All Rights Reserved" license](/DATA_LICENSE.md) and may not be reused
+without explicit permission from the author.
 
 ## Contact
 
