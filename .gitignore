@@ -196,6 +196,7 @@ cython_debug/
 *.docx
 *.pptx
 *.png
+!reports/figures/arquitectura_cnn2d.png
 *.pdf
 !docs/model_architecture.png
 !reports/Propuesta Trabajo Final.pdf
