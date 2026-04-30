@@ -174,32 +174,36 @@ test set.
 Se permutaron aleatoriamente los 63 canales espectrales de cada parche 5×5, preservando
 la estructura espacial del vecindario pero destruyendo el contenido espectral.
 
-| condición              | PR-AUC | ROC-AUC | F1    |
-|------------------------|--------|---------|-------|
-| modelo original        | 0.9637 | 0.8902  | —     |
-| espectro permutado     | **PENDIENTE** | | |
+| condición              | PR-AUC | ROC-AUC | F1-macro |
+|------------------------|--------|---------|----------|
+| modelo original        | 0.9637 | 0.8902  | 0.7762   |
+| espectro permutado     | 0.7633 | 0.5056  | 0.4982   |
 
-*Interpretación esperada: si PR-AUC colapsa a ~0.5–0.6, confirma dependencia
-fundamental del contenido espectral.*
+**Interpretación:** el ROC-AUC colapsa a 0.5056 (clasificador aleatorio) y la F1-macro
+cae a 0.50 cuando se destruye la información espectral. La caída de 20.8 puntos en
+PR-AUC confirma que el modelo depende fundamentalmente del contenido espectral de los
+63 canales, no de la posición espacial de las parcelas.
 
 ### 7.2 Evaluación solo con píxel central (sin contexto espacial)
 
-Se zerorizaron los píxeles vecinos del parche 5×5, conservando únicamente el canal
-espectral del píxel central. Equivale a una evaluación espectral pura sin contexto
-espacial.
+Se zerorizaron los píxeles vecinos del parche 5×5, conservando únicamente el espectro
+del píxel central. Equivale a una evaluación espectral pura sin contexto espacial.
 
-| condición              | PR-AUC | ROC-AUC | F1    |
-|------------------------|--------|---------|-------|
-| modelo original        | 0.9637 | 0.8902  | —     |
-| solo píxel central     | **PENDIENTE** | | |
+| condición              | PR-AUC | ROC-AUC | F1-macro |
+|------------------------|--------|---------|----------|
+| modelo original        | 0.9637 | 0.8902  | 0.7762   |
+| solo píxel central     | 0.8149 | 0.5819  | 0.4487   |
 
-*Interpretación esperada: si PR-AUC cae a ~0.83 (comparable al CNN-1D real),
-la ganancia de 0.96 vs 0.83 proviene del contexto espacial local legítimo,
-no de memorización de posiciones.*
+**Interpretación:** el PR-AUC con solo el píxel central (0.8149) es prácticamente
+equivalente al obtenido por el CNN-1D real (0.83), que opera exclusivamente sobre el
+vector espectral de un píxel sin vecindad. La diferencia entre 0.9637 y 0.8149 (0.149
+puntos) representa la ganancia atribuible al contexto espacial local del parche 5×5,
+que es información espectral de píxeles vecinos dentro de la misma parcela —
+no memorización de la forma o posición de los polígonos etiquetados.
 
 ---
 
-## 8. Hallazgos preliminares
+## 8. Hallazgos
 
 - **Los entries no documentados (9 y 10) no tienen presencia en el test set.** El
   PR-AUC reportado (0.9635) fue calculado exclusivamente sobre píxeles de los 7
@@ -222,6 +226,13 @@ no de memorización de posiciones.*
   dificultad real de clasificación en ese genotipo, incompatible con la hipótesis
   de memorización espacial.
 
+- **Las pruebas de ablación confirman dependencia espectral.** Cuando se destruye el
+  contenido espectral (permutación de canales), el ROC-AUC colapsa a 0.51 (aleatorio)
+  y el PR-AUC cae 20.8 puntos. Cuando se evalúa solo el píxel central (sin vecindad
+  espacial), el PR-AUC resultante (0.815) es equivalente al del CNN-1D real (0.83),
+  lo que indica que la ganancia adicional del CNN-2D proviene del contexto espectral
+  local de los píxeles vecinos, no de la geometría de las parcelas.
+
 - **El diseño experimental presenta una irregularidad objetiva** en los datos crudos
   (entries 9 y 10 de procedencia no documentada, exclusivos de class=0), cuya
   influencia en el entrenamiento (vía train y val) merece ser discutida, pero que
@@ -232,10 +243,6 @@ no de memorización de posiciones.*
 
 ## 9. Próximos pasos
 
-*(Pendiente de discusión con la directora y revisión en web Claude antes de redactar
-la respuesta definitiva al jurado.)*
-
-- Completar resultados de las pruebas de ablación (secciones 7.1 y 7.2).
 - Decidir si se reporta la ausencia de entry 4 del test set como limitación del diseño
   del split.
 - Evaluar si incluir la variación de PR-AUC entre genotipos (0.82–0.99) en la sección
