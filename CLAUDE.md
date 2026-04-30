@@ -234,6 +234,68 @@ Total estimate: ~65–70 h.
 > models with `dvc pull models.dvc`. CNN-2D is also accessible via MLflow as registered
 > model `bean_stress_classifier` v1 (Production).
 
+**CNN-2D architecture (verified 2026-04-30, smoke-tested on PC A)**
+
+- **Class:** `SpectralSpatialCNN2D` — defined in `305-jmmz-dl-binary-modeling.ipynb` (NOT in `spectralcrop/`)
+- **Saved as:** `state_dict()` — must instantiate class before `load_state_dict()`
+- **Input:** patch `(63, 5, 5)` — 63 spectral channels, 5×5 spatial patch around each pixel
+- **Output:** 2 logits (CrossEntropyLoss) — binary: stressed / non-stressed
+- **Total parameters:** 372,994
+- **Final hyperparameters:** kernel_size=5, dropout=0.373, lr=1.856e-4, batch_size=64
+- **Optimizer:** Adam, no scheduler, early stopping on val PR-AUC (patience=15)
+- **MLflow run_id:** `61a3cc05f39d46f79f2e3fa3d29fae7f` | test_pr_auc=0.9635 | stage=Production
+
+```python
+# Standard load pattern used throughout the project (from notebook 305):
+import json, torch, torch.nn as nn, torch.nn.functional as F
+from spectralcrop.utils.path_manager import PathManager
+
+class SpectralSpatialCNN2D(nn.Module):
+    def __init__(self, n_channels=63, n_classes=2, dropout=0.3, kernel_size=3):
+        super().__init__()
+        pad = kernel_size // 2
+        self.conv1 = nn.Conv2d(n_channels, 32, kernel_size=kernel_size, padding=pad)
+        self.bn1   = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=kernel_size, padding=pad)
+        self.bn2   = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=kernel_size, padding=pad)
+        self.bn3   = nn.BatchNorm2d(128)
+        self.pool  = nn.AdaptiveAvgPool2d((2, 2))
+        self.fc1   = nn.Linear(128 * 2 * 2, 128)
+        self.drop  = nn.Dropout(dropout)
+        self.fc2   = nn.Linear(128, n_classes)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = self.pool(x)
+        x = torch.flatten(x, 1)
+        x = F.relu(self.fc1(x))
+        x = self.drop(x)
+        return self.fc2(x)
+
+name = "cnn2d_final_model"
+models_path = PathManager().get_abs_path_folder("models")
+if isinstance(models_path, list):
+    models_path = [p for p in models_path if "spectralcrop" not in p][0]
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+with open(models_path + f"{name}_info.json") as f:
+    info = json.load(f)
+
+model2d = SpectralSpatialCNN2D(
+    n_channels=info["n_channels"],
+    dropout=info["dropout"],
+    kernel_size=info["kernel_size"],
+).to(device)
+model2d.load_state_dict(
+    torch.load(models_path + f"{name}_weights.pt", map_location=device, weights_only=False)
+)
+model2d.eval()
+```
+
 **DVC status**
 - Remote `origin` (default): `s3://dvc` at `https://dagshub.com/johnma96/thesis.s3`
 - Remote `gdrive`: `gdrive://13-Epgcmqi7_UjRaSj5l8J-cGHvRM3zxO` (secondary)
@@ -498,6 +560,12 @@ These issues were found when running `dvc pull` on PC A for the first time in th
 - **Blocker 4 (labels_export.gpkg)** — ✅ Resolved 2026-04-30 (PC B). `data/raw/` (9.5 GB,
   5 files) was already present in DagsHub S3 (`dvc push data/raw.dvc` → "Everything is up to
   date"). PC B version is authoritative. No version conflict remains.
+
+**PC A sync verified 2026-04-30.** `dvc pull --force` completed successfully.
+`dvc status -c` → "Cache and remote 'origin' are in sync." All models pulled (20 files, ~77 MB
+including `cnn2d_final_model_weights.pt`). CNN-2D architecture confirmed: `SpectralSpatialCNN2D`,
+372,994 params, smoke-tested (input `(63,5,5)` → output `(2,)` ✓). MLflow connection verified
+via token auth (run_id `61a3cc05f39d46f79f2e3fa3d29fae7f`, test_pr_auc=0.9635, status=FINISHED).
 
 ### DagsHub connection reference
 
