@@ -219,10 +219,20 @@ Total estimate: ~65–70 h.
 
 | File | Size | Notes |
 |---|---|---|
-| `cnn1d_final_model_weights.pt` | 83 KB | CNN-1D weights — present locally, verify against DagsHub |
+| `cnn1d_final_model_weights.pt` | 92 KB | CNN-1D final weights |
 | `cnn1d_final_model_info.json` | 283 B | CNN-1D architecture metadata |
+| `cnn1d_baseline_weights.pt` | 83 KB | CNN-1D baseline weights |
+| `cnn2d_final_model_weights.pt` | 1.5 MB | CNN-2D final weights. MLflow run_id: `61a3cc05f39d46f79f2e3fa3d29fae7f` |
+| `cnn2d_final_model_info.json` | 290 B | CNN-2D architecture metadata (patch_size=5, n_channels=63, test_pr_auc=0.9635) |
+| `cnn2d_patch_size_3_baseline_weights.pt` | 702 KB | CNN-2D baseline patch=3 |
+| `cnn2d_patch_size_5_baseline_weights.pt` | 702 KB | CNN-2D baseline patch=5 |
 | `robust_scaler.pkl` | 1.5 KB | Fitted preprocessing scaler |
-| CNN-2D model | — | **NOT present locally** — must be retrieved from MLflow (see Blocker 3) |
+| `lgbm_cv_final_model.pkl` / `xgboost_cv_final_model.pkl` / etc. | ~77 MB total | ML final models and baselines |
+
+> **Updated 2026-04-30 (PC B):** All 20 model files tracked via `models.dvc` (76 MB, hash
+> `de0a2ed73f10748741e1cd4ff481ca68.dir`) and pushed to DagsHub S3. PC A retrieves all
+> models with `dvc pull models.dvc`. CNN-2D is also accessible via MLflow as registered
+> model `bean_stress_classifier` v1 (Production).
 
 **DVC status**
 - Remote `origin` (default): `s3://dvc` at `https://dagshub.com/johnma96/thesis.s3`
@@ -472,7 +482,22 @@ These issues were found when running `dvc pull` on PC A for the first time in th
 - Fix (on PC B): verify which version is correct, then `.venv/Scripts/dvc push data/raw.dvc` if the PC B version is newer
 
 ### Resolved blockers
-*(Populate this subsection as PC B resolves each blocker, with date, run ID, and any relevant notes.)*
+
+- **Blocker 1 (data/processed/)** — ✅ Resolved 2026-04-30 (PC B). Re-added directory to capture
+  current state (126 files; 2 new CSVs — train_loss_cnn1d.csv, train_loss_cnn2d.csv — included).
+  New hash: `7fb0e1fe2a79f6b14c65597f7c286f09.dir` (was `5035214eec3f778e1bc503e3f503efc9.dir`).
+  Pushed 3 new objects to DagsHub S3. Verified with `dvc status -c`.
+- **Blocker 2 (references/papers/)** — ✅ Resolved 2026-04-30 (PC B). Pushed 3 new objects
+  (including davis2006.pdf, saito2015.pdf). 90 papers / 382 MB now in DagsHub S3.
+- **Blocker 3 (CNN-2D model)** — ✅ Resolved 2026-04-30 (PC B). Model was already present
+  locally (`cnn2d_final_model_weights.pt`, 1.5 MB, Jan 6). Confirmed identical to MLflow
+  run_id `61a3cc05f39d46f79f2e3fa3d29fae7f` (name: `cnn2d_final_model`, test_pr_auc=0.9635,
+  registered as `bean_stress_classifier` v1 Production). Entire `models/` directory tracked
+  via `models.dvc` (20 files, 76 MB) and pushed. PC A retrieves all models with
+  `dvc pull models.dvc`.
+- **Blocker 4 (labels_export.gpkg)** — ✅ Resolved 2026-04-30 (PC B). `data/raw/` (9.5 GB,
+  5 files) was already present in DagsHub S3 (`dvc push data/raw.dvc` → "Everything is up to
+  date"). PC B version is authoritative. No version conflict remains.
 
 ### DagsHub connection reference
 
@@ -562,10 +587,11 @@ Read the entire repository and autocompleted the verified state sections in this
 ### Task 1 — Create working branch ✅ DONE (PC A, 2026-04-29)
 Branch `corrections-jury-2026` created from `main`, pushed to remote.
 
-### Task 2 — Sync code, data, and models from DagsHub to local 🟡 IN PROGRESS
+### Task 2 — Sync code, data, and models from DagsHub to local ✅ DONE (PC B, 2026-04-30)
 - PC A: `dvc pull` attempted, revealed 4 blockers (see "Known sync blockers" above)
-- **PC B (next session):** push missing artifacts (see "PC B bootstrap")
-- PC A (after PC B push): `dvc pull` to receive everything
+- PC B: all artifacts pushed to DagsHub S3. `dvc status -c` → "Cache and remote 'origin' are in sync."
+- **PC A (next session):** run `git pull origin corrections-jury-2026` then `dvc pull` to receive
+  everything, then proceed with Task 3 (uv migration) or directly to Task 4 (Category D).
 
 ### Task 3 — Migrate from pip + requirements*.txt to uv + pyproject.toml ⏳ PENDING
 - Inspect existing `requirements.txt`, `requirements-pytorch-cpu.txt`, `requirements-pytorch-cu126.txt`, and `environment.yml`
