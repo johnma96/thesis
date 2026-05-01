@@ -1,0 +1,192 @@
+{
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 154 Stepping 3, GenuineIntel",
+    "ram_gb": 15.7,
+    "gpu": "NVIDIA GeForce RTX 3050 Laptop GPU",
+    "device_used_for_inference": "cuda"
+  },
+  "CNN-1D": {
+    "n_params": 21474,
+    "size_kb": 91.0,
+    "inference": {
+      "throughput_samples_s": 670179.0,
+      "latency_batch_ms": 0.76,
+      "time_1M_pixels_s": 1.5,
+      "peak_mem_mb": 21.2
+    },
+    "mlflow": {
+      "run_id": "29ac2d4f6f3740878a235802cdc04b73",
+      "training_s": 3496,
+      "max_epochs": "200",
+      "actual_epochs": 109,
+      "batch_size": "128"
+    }
+  },
+  "CNN-2D": {
+    "n_params": 372994,
+    "size_kb": 1467.6,
+    "inference": {
+      "throughput_samples_s": 136168.4,
+      "latency_batch_ms": 3.76,
+      "time_1M_pixels_s": 7.3,
+      "peak_mem_mb": 29.3
+    },
+    "mlflow": {
+      "run_id": "61a3cc05f39d46f79f2e3fa3d29fae7f",
+      "training_s": 1051,
+      "max_epochs": "80",
+      "actual_epochs": 22,
+      "batch_size": "64"
+    }
+  },
+  "ML": {
+    "LogisticRegression": {
+      "size_kb": 2.8,
+      "param_info": {
+        "type": "linear",
+        "n_coef": 63,
+        "n_intercept": 1,
+        "total": 64
+      },
+      "inference": {
+        "throughput_samples_s": 652216.8,
+        "latency_batch_ms": 0.79,
+        "time_1M_pixels_s": 1.5,
+        "peak_mem_mb": 0.5
+      },
+      "mlflow": {
+        "run_id": "5c2825036d484209806ea2de724f0d79",
+        "training_s": 208,
+        "params": {
+          "uses_pipeline_scaler": "True",
+          "cv_folds": "5",
+          "model_type": "LogisticRegression",
+          "penalty": "l2",
+          "C": "0.04044574059404954",
+          "solver": "lbfgs",
+          "max_iter": "518",
+          "class_weight": "balanced",
+          "n_jobs": "-1",
+          "random_state": "42",
+          "l1_ratio": "0.4418646837803779",
+          "best_cv_fold": "4"
+        }
+      }
+    },
+    "SGDClassifier": {
+      "size_kb": 2.9,
+      "param_info": {
+        "type": "linear",
+        "n_coef": 63,
+        "n_intercept": 1,
+        "total": 64
+      },
+      "inference": {
+        "throughput_samples_s": 705798.0,
+        "latency_batch_ms": 0.73,
+        "time_1M_pixels_s": 1.4,
+        "peak_mem_mb": 0.0
+      },
+      "mlflow": {
+        "run_id": "cb6d38bef25648658db3bffc3e31836b",
+        "training_s": 173,
+        "params": {
+          "uses_pipeline_scaler": "True",
+          "best_cv_fold": "4",
+          "model_type": "SGDClassifier",
+          "loss": "log_loss",
+          "penalty": "l1",
+          "alpha": "2.4400771927662253e-05",
+          "learning_rate": "adaptive",
+          "eta0": "0.07805212148154592",
+          "max_iter": "1360",
+          "tol": "0.0003242551761422182",
+          "class_weight": "balanced",
+          "random_state": "42",
+          "n_jobs": "-1",
+          "cv_folds": "5"
+        }
+      }
+    },
+    "LightGBM": {
+      "size_kb": 30.2,
+      "param_info": {
+        "type": "lgbm_trees",
+        "n_estimators": 1,
+        "num_leaves": 123
+      },
+      "inference": {
+        "throughput_samples_s": 231230.6,
+        "latency_batch_ms": 2.21,
+        "time_1M_pixels_s": 4.3,
+        "peak_mem_mb": 0.8
+      },
+      "mlflow": {
+        "run_id": "7f06417df3e746b08c5e259d34a1e380",
+        "training_s": 115,
+        "params": {
+          "best_cv_fold": "5",
+          "uses_pipeline_scaler": "True",
+          "objective": "binary",
+          "eval_metric": "average_precision",
+          "learning_rate": "0.012151617026673379",
+          "num_leaves": "123",
+          "max_depth": "12",
+          "subsample": "0.7218455076693483",
+          "min_child_samples": "83",
+          "min_split_gain": "0.0",
+          "colsample_bytree": "0.6390688456025535",
+          "n_estimators": "3000",
+          "random_state": "42",
+          "n_jobs": "-1",
+          "verbosity": "-1",
+          "reg_alpha": "0.012746711578215055",
+          "reg_lambda": "0.0012052231254145623",
+          "scale_pos_weight": "0.43154282731336147",
+          "model_type": "LGBMClassifier",
+          "cv_folds": "5"
+        }
+      }
+    },
+    "XGBoost": {
+      "size_kb": 35911.1,
+      "param_info": {
+        "type": "xgb_trees",
+        "n_estimators": 5500
+      },
+      "inference": {
+        "throughput_samples_s": 54098.9,
+        "latency_batch_ms": 9.46,
+        "time_1M_pixels_s": 18.5,
+        "peak_mem_mb": 0.4
+      },
+      "mlflow": {
+        "run_id": "c9156f9c3e424313bb50051d249082b9",
+        "training_s": 2130,
+        "params": {
+          "best_cv_fold": "3",
+          "cv_folds": "5",
+          "uses_pipeline_scaler": "True",
+          "objective": "binary:logistic",
+          "max_depth": "8",
+          "learning_rate": "0.028537584377378997",
+          "subsample": "0.826600824178393",
+          "colsample_bytree": "0.7539607086772941",
+          "eval_metric": "aucpr",
+          "max_delta_step": "1",
+          "tree_method": "hist",
+          "n_estimators": "5500",
+          "n_jobs": "-1",
+          "early_stopping_rounds": "200",
+          "random_state": "42",
+          "verbosity": "0",
+          "min_child_weight": "4.924898502150522",
+          "gamma": "1.6214678216883898",
+          "reg_alpha": "0.0312847591640441",
+          "reg_lambda": "9.268367239048338",
+          "scale_pos_weight": "0.43154282731336147"
+        }
+      }
+    }
+  }
+}
