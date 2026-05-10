@@ -34,19 +34,19 @@ Agradezco al jurado evaluador la rigurosidad y profundidad de las observaciones 
 | 8 | Aclaración sobre la única toma aérea | Metodología | **Atendida** | §3.1.2 |
 | 9 | Justificación de los 12 algoritmos iniciales | Metodología | **Atendida** | §3.4.3.1 |
 | 10 | Profundización del análisis de Random Forest | Modelado | Pendiente | §4.x |
-| 11 | Hiperparametrización sin cambios significativos | Modelado | **Atendida** | §4.x |
-| 12 | Importancia relativa de FP vs FN | Discusión | Pendiente | §4.x |
+| 11 | Hiperparametrización sin cambios significativos | Modelado | **Atendida** | §4.2 |
+| 12 | Importancia relativa de FP vs FN | Discusión | **Atendida** | §4.6 |
 | 13 | Caso práctico: parcelas con plantas mixtas | Discusión | Pendiente | §4.x |
 | 14 | Reestructuración de conclusiones | Estructura | Pendiente | §5 |
 | 15 | Trabajo futuro: validación ante otros estreses y genotipos | Estructura | Pendiente | §5 |
 | 16 | Matrices de confusión en porcentajes y reducción de datos | Análisis | Pendiente | §4.x |
 | 17 | Influencia real de los índices de vegetación | Análisis | Pendiente | §4.x |
-| 18 | Métricas de costo computacional para modelos DL | Análisis | **Atendida** | §4.2.1 |
+| 18 | Métricas de costo computacional para modelos DL | Análisis | **Atendida** | §4.4.1 |
 | 19 | Diagrama del diseño experimental | Análisis | **Atendida** | §3.1.1 |
 | 20 | Riesgo de aprendizaje de estructura espacial en CNN-2D | Modelado | **Atendida** | §4.3 |
 
-**Observaciones atendidas en esta entrega:** 8 de 20.
-**Observaciones pendientes:** 12 (en proceso de atención).
+**Observaciones atendidas en esta entrega:** 10 de 20.
+**Observaciones pendientes:** 10 (en proceso de atención).
 
 ---
 
@@ -77,7 +77,7 @@ La diferencia entre el PR-AUC global del CNN-2D (0,964) y el obtenido en la Prue
 
 **Sobre el efecto de la no estratificación por genotipo en los splits.** Se reconoce explícitamente como una limitación del diseño experimental que la partición espacial fue estratificada únicamente por la etiqueta binaria y no por genotipo, motivo por el cual los entries 4, 9 y 10 no aparecen en el holdout. Esta limitación se documenta en el texto y se incorpora al apartado de trabajo futuro como una línea de mejora metodológica para estudios subsiguientes.
 
-**Citas bibliográficas incorporadas:** Roberts et al. (2017), Kattenborn et al. (2022) sobre autocorrelación espacial en modelos CNN aplicados a teledetección; Okyere et al. (2023) sobre la complementariedad espectral-espacial en CNN híbridos para detección de deficiencias nutricionales.
+**Citas bibliográficas incorporadas:** Roberts et al. (2017) sobre estrategias de validación cruzada para datos con estructura espacial; Kattenborn et al. (2022) sobre la inflación del desempeño en CNN cuando hay autocorrelación espacial entre muestras de entrenamiento y validación; Okyere et al. (2023) sobre la complementariedad espectro-espacial en modelos profundos para identificación del estado nutricional con HSI.
 
 ### Ubicación en el documento
 
@@ -228,9 +228,50 @@ La heterogeneidad de las ganancias por optimización bayesiana entre los seis al
 ### Ubicación en el documento
 
 - §4.2 "Comparación entre modelos" — reescritura del párrafo final sobre HPO (tres párrafos nuevos).
-- §4.X.X "Resultados de los modelos CNN-2D" — ajuste del párrafo sobre comparación baseline vs final.
-- §4.X.X "Síntesis de los resultados de Deep Learning" — reformulación del bullet sobre HPO.
-- §4.X.X "Síntesis de los resultados de Machine Learning" — bullet adicional sobre LightGBM.
+- §4.1.2 "Resultados de los modelos CNN-2D" — ajuste del párrafo sobre comparación baseline vs final.
+- §4.1.x "Síntesis de los resultados de Deep Learning" — reformulación del bullet sobre HPO.
+- §4.1.x "Síntesis de los resultados de Machine Learning" — bullet adicional sobre LightGBM.
+
+---
+
+## Observación 12 — Importancia relativa de los falsos positivos frente a los falsos negativos
+
+### Texto original del jurado
+
+> *"En la discusión, se debe considerar la importancia de los falsos positivos frente a los falsos negativos."*
+
+### Descripción de las modificaciones realizadas
+
+Se ampliaron dos párrafos nuevos en §4.6 "Discusión de resultados" para abordar la importancia relativa de los errores de clasificación en el contexto operativo del trabajo. La extensión se integra al hilo argumentativo continuo de la discusión —preservando el formato narrativo de la sección— inmediatamente después del párrafo existente sobre PR-AUC y manejo del desbalance de clases (que ya introducía la idea brevemente vía la cita de Saini et al., 2025) y antes del párrafo sobre ausencia de sobreajuste.
+
+**Primer párrafo añadido — Encuadre operativo y asimetría de costos.**
+
+Se contextualiza la discusión recordando el alcance operativo planteado en el Capítulo 1: el sistema desarrollado se concibe como una herramienta de apoyo a la toma de decisiones para la **detección temprana** del estrés por deficiencia de fósforo, con miras a posibilitar una intervención oportuna a través de una gestión nutricional ajustada. Bajo este encuadre, se argumenta que los falsos positivos y falsos negativos no implican costos equivalentes:
+
+- Un **falso negativo** —planta efectivamente estresada que el modelo clasifica como sana— se traduce en una microzona del cultivo que no recibe atención cuando la requiere, prolongando la condición de estrés y comprometiendo la eficiencia fotosintética y el rendimiento. Considerando que la fertilización fosfórica adecuada puede incrementar el rendimiento del fríjol común hasta en un 38 % frente a manejos deficientes (Y. Gao et al., 2016), el costo agronómico de un FN no detectado se materializa en pérdidas de productividad difícilmente recuperables en la misma campaña.
+- Un **falso positivo**, en contraste, desencadena típicamente una intervención local sobre una planta o zona que no la requería; el costo asociado es principalmente económico (uso adicional de fertilizante) y ambiental (potencial lixiviación de nutrientes), de magnitud claramente menor a la pérdida por estrés no atendido.
+
+Se incorpora la cita de **Breure et al. (2022)** para sustentar el marco general: los autores argumentan que las funciones de pérdida asociadas a errores de subestimación y sobreestimación de nutrientes son típicamente asimétricas en agricultura de precisión, y deben tratarse como tales en el diseño de sistemas de apoyo a la decisión.
+
+**Segundo párrafo añadido — Perfiles operativos diferenciados de los modelos evaluados.**
+
+A la luz de esta asimetría, se caracterizan los seis modelos evaluados por su perfil operativo, conectando los resultados con la implicación práctica de su despliegue:
+
+- **CNN-2D optimizado:** balance entre precisión (0,895) y recall (0,886); adecuado tanto para tareas de caracterización del campo como para apoyo a decisiones de intervención.
+- **LightGBM optimizado:** recall ≈ 0,91 con precisión menor (≈ 0,75); perfil consistente con un sistema orientado a maximizar la sensibilidad de detección, prefiriendo asumir el costo de algunos falsos positivos para reducir el riesgo de pérdidas por estrés no detectado.
+- **Modelos lineales (LR, SGD):** recall en el rango 0,68–0,70; adecuados como referencias metodológicas más que como herramientas operativas en un escenario donde la sensibilidad sea el criterio dominante.
+
+Se concluye argumentando que la elección del modelo para un despliegue operativo no depende exclusivamente del PR-AUC global sino de la prioridad agronómica del usuario final, y que el ajuste fino del umbral de decisión aporta un grado adicional de control para modular el balance FP/FN según el contexto de aplicación.
+
+### Verificación de coherencia con el Capítulo 1
+
+Se verificó que el caso operativo planteado (detección temprana para intervenir) es coherente con las menciones del Capítulo 1 al respecto, sin contradicción interna: el alcance operativo aparece consistentemente declarado en cinco pasajes de la introducción y la justificación del problema, todos ellos enfatizando "detección temprana", "intervención temprana", "gestión nutricional" y "optimización del uso de fertilizantes".
+
+**Citas bibliográficas incorporadas:** Y. Gao et al. (2016) — referencia ya presente en el Capítulo 1; Breure et al. (2022) — cita nueva añadida a la bibliografía.
+
+### Ubicación en el documento
+
+- §4.6 "Discusión de resultados" — dos párrafos nuevos integrados al hilo argumentativo continuo, después del párrafo sobre PR-AUC y desbalance de clases.
 
 ---
 
@@ -294,7 +335,7 @@ Se incorporó a §3.1.1 "Origen y condiciones del experimento" un diagrama de la
 
 **Texto introductorio de la figura.** Se redactó un párrafo que articula las dos perspectivas del diseño:
 
-- La **estructura factorial conceptual**, ilustrada en la nueva Figura 3-X.
+- La **estructura factorial conceptual**, ilustrada en la nueva Figura 3-2.
 - La **realización física sobre el lote experimental**, referenciada hacia la Figura existente en §3.2.4 (NDVI con polígonos de etiquetado), que ya cumple esa función de manera satisfactoria en el documento original.
 
 **Decisión de no incluir un tercer mapa.** Durante la elaboración se generó adicionalmente una figura de distribución espacial basada en los centroides de los polígonos. Tras evaluar su valor informativo, se concluyó que aportaba información redundante respecto a la Figura existente de NDVI + polígonos en §3.2.4 y se descartó su inclusión en el documento. El archivo correspondiente queda disponible en el repositorio como evidencia del trabajo realizado, sin referencia desde el documento.
@@ -318,7 +359,6 @@ Las siguientes observaciones se encuentran en proceso de atención y serán abor
 | 4 | Justificación del umbral NDVI | Metodología |
 | 5 | Criterio de "alto bienestar" y representatividad | Metodología |
 | 10 | Profundización del análisis de Random Forest | Modelado |
-| 12 | Importancia relativa de FP vs FN | Discusión |
 | 13 | Caso práctico: parcelas con plantas mixtas | Discusión |
 | 14 | Reestructuración de conclusiones | Estructura |
 | 15 | Trabajo futuro: validación ante otros estreses y genotipos | Estructura |
@@ -344,9 +384,20 @@ Las modificaciones realizadas se acompañan de los siguientes recursos en el rep
 
 ---
 
+## Referencias bibliográficas incorporadas durante el proceso de corrección
+
+Se relacionan a continuación las referencias bibliográficas nuevas integradas a la bibliografía del trabajo durante la atención de las observaciones del jurado:
+
+- **Breure, T. S., Haefele, S. M., Hannam, J. A., Corstanje, R., Webster, R., Moreno-Rojas, S., & Milne, A. E.** (2022). A loss function to evaluate agricultural decision-making under uncertainty: A case study of soil spectroscopy. *Precision Agriculture, 23*(5), 1942–1971. https://doi.org/10.1007/s11119-022-09887-2 — Observación 12.
+- **Kattenborn, T., Schiefer, F., Frey, J., Feilhauer, H., Mahecha, M. D., & Dormann, C. F.** (2022). Spatially autocorrelated training and validation samples inflate performance assessment of convolutional neural networks. *ISPRS Open Journal of Photogrammetry and Remote Sensing, 5*, 100018. https://doi.org/10.1016/j.ophoto.2022.100018 — Observación 20.
+- **Okyere, F. G., Cudjoe, D., Sadeghi-Tehran, P., Virlet, N., Riche, A. B., Castle, M., Greche, L., Simms, D., Mhada, M., Mohareb, F., & Hawkesford, M. J.** (2023). Modeling the spatial-spectral characteristics of plants for nutrient status identification using hyperspectral data and deep learning methods. *Frontiers in Plant Science, 14*, 1209500. https://doi.org/10.3389/fpls.2023.1209500 — Observación 20.
+- **Roberts, D. R., Bahn, V., Ciuti, S., Boyce, M. S., Elith, J., Guillera-Arroita, G., Hauenstein, S., Lahoz-Monfort, J. J., Schröder, B., Thuiller, W., Warton, D. I., Wintle, B. A., Hartig, F., & Dormann, C. F.** (2017). Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. *Ecography, 40*(8), 913–929. https://doi.org/10.1111/ecog.02881 — Observación 20.
+
+---
+
 ## Cierre
 
-Las modificaciones documentadas en esta carta corresponden a las ocho observaciones del jurado evaluador atendidas hasta la fecha. La totalidad de las observaciones restantes (doce) están en proceso de atención bajo el cronograma establecido para la entrega final, con fecha límite del 12 de mayo de 2026.
+Las modificaciones documentadas en esta carta corresponden a las diez observaciones del jurado evaluador atendidas hasta la fecha. La totalidad de las observaciones restantes (diez) están en proceso de atención bajo el cronograma establecido para la entrega final, con fecha límite del 12 de mayo de 2026.
 
 Quedo a disposición del jurado evaluador para resolver cualquier inquietud adicional sobre las modificaciones realizadas o sobre el avance del trabajo en su conjunto.
 
