@@ -1,72 +1,1183 @@
-# **** Short guide for creating and activating virtual environments, 
-#                 and installing libraries with venv ***
+# ============================================================
+# SpectraBean — Dependencias del proyecto
+# Python 3.12.x  |  Entorno: .venv
+# ============================================================
 #
-# --- Create virtual environment ---
+# Setup rápido:
+#   python -m venv .venv
+#   source .venv/Scripts/activate          # Windows Git Bash
+#   # o: .venv\Scripts\activate            # Windows CMD
 #
-# python -m venv .venv
+#   pip install --upgrade pip
+#   pip install -r requirements.txt
 #
-# --- Activate virtual environment ---
+# PyTorch (instalar por separado según hardware):
+#   CPU:        pip install -r requirements-pytorch-cpu.txt
+#   CUDA 12.6:  pip install -r requirements-pytorch-cu126.txt
 #
-# Unix orMac systems
-#     source venv/bin/activate
-# Windows system 
-#    - using git bash: source .venv/Scripts/activate
-#    - using command promt or anaconda terminal: .venv\Scripts\activate
-#
-# --- Install libraries ---
-#
-# python -m pip install --upgrade pip
-# pip config set global.trusted-host "pypi.org files.pythonhosted.org pypi.python.org"
-# pip install --no-cache-dir -r requirements.txt
+# ============================================================
 
-# pyprojroot==0.3.0
-# ipykernel==6.29.4
-# pytz==2024.1
-# pip-chill==1.0.3
-# pyodbc==5.1.0
-# python-dotenv==1.0.1
-# pandas==2.2.2
-# ydata-profiling==4.8.3
-# hydra-core==1.3.2
-# openpyxl==3.1.2
-# matplotlib==3.8.4
-# seaborn==0.13.2
-# scikit-learn==1.4.2
-# mlflow==2.11.3
-# sphinx==7.4.7
-# pydata-sphinx-theme==0.15.4
-# recommonmark==0.7.1
+# ------------------------------------------------------------
+# Núcleo numérico / datos
+# ------------------------------------------------------------
+numpy==2.3.5
+pandas==2.2.3
+scipy==1.16.2
 
-# ipykernel==6.29.5
-# ipywidgets==8.1.5
-# matplotlib==3.10.1
-# opencv-python==4.11.0.86
-# pandas==2.2.3
-# pip-chill==1.0.3
-# pyprojroot==0.3.0
-# python-dotenv==1.1.0
-# rasterio==1.4.3
-# spectral==0.24
-# scipy==1.16.2
-# dvc[s3,gdrive]==3.63.0
-# scikit-learn==1.7.2
-# xgboost==3.1.2
-# dask==2025.10.0
-# geopandas==1.1.1
-# rioxarray==0.20.0
-# zarr==3.1.5
-# imbalanced-learn==0.14.0
-# optuna==4.6.0
-# mlflow==3.8.1
-# dagshub==0.6.4
+# ------------------------------------------------------------
+# Geoespacial / hiperespectral
+# ------------------------------------------------------------
+rasterio==1.4.3
+rioxarray==0.20.0
+geopandas==1.1.1
+affine==2.4.0
+spectral==0.24
+opencv-python==4.11.0.86
 
-openpyxl==3.1.2
-ipykernel==6.29.4
-ipywidgets==8.1.5
-pandas==2.2.2
-matplotlib==3.8.4
+# ------------------------------------------------------------
+# Arrays multidimensionales / datos estructurados
+# ------------------------------------------------------------
+xarray==2025.12.0
+dask==2025.10.0
+zarr==3.1.5
+numcodecs==0.16.5
+
+# ------------------------------------------------------------
+# Machine Learning
+# ------------------------------------------------------------
+scikit-learn==1.7.2
+imbalanced-learn==0.14.0
+xgboost==3.1.2
+lightgbm==4.6.0
+optuna==4.6.0
+joblib==1.5.3
+
+# Exploración inicial de modelos (notebook 301)
+# Nota: lazypredict puede tener conflictos con scikit-learn >= 1.6
+# Instalar manualmente si se necesita: pip install lazypredict==0.2.12
+# lazypredict==0.2.12
+
+# ------------------------------------------------------------
+# Seguimiento de experimentos / versionado de datos
+# ------------------------------------------------------------
+mlflow==3.8.1
+dagshub==0.6.4
+dvc[s3,gdrive]==3.63.0
+
+# ------------------------------------------------------------
+# Visualización
+# ------------------------------------------------------------
+matplotlib==3.10.1
 seaborn==0.13.2
-scikit-learn==1.6.0
-ortools==9.9.3963
-lazypredict==0.2.12
-PyQt5==5.15.10
+
+# ------------------------------------------------------------
+# Utilitarios
+# ------------------------------------------------------------
+pyprojroot==0.3.0
+python-dotenv==1.1.0
+tqdm==4.67.1
+psutil==7.1.3
+
+# ------------------------------------------------------------
+# Jupyter / desarrollo
+# ------------------------------------------------------------
+ipykernel==6.29.5
+ipywidgets==8.1.5
+
+
+
+
+# Sesión: Correcciones C #16 (matrices de confusión en %) y C #17 (ablación de índices de vegetación)
+
+## Contexto
+
+Continuamos con las correcciones del jurado para la tesis sobre detección
+de estrés por fósforo en frijol con HSI + ML/DL. Ver docs/thesis_corrections/carta_respuesta_jurado.md. Las correcciones D, B y
+las restantes de C #18 y C #19 ya están cerradas. Esta sesión cubre las
+dos últimas observaciones de Categoría C que requieren análisis adicional
+sobre los resultados existentes:
+
+- C #16: convertir matrices de confusión a porcentajes y aclarar la
+  reducción de datos en el CNN-2D (Ver notebooks 304 y 305) y las imágenes en reports/figures/confusion_matrix....png.
+- C #17: validar la influencia real de los índices de vegetación frente a
+  las características utilizadas en el modelo final.
+
+Ambas se resuelven sin reentrenamiento alguno: solo análisis sobre los
+modelos finales registrados en MLflow y sobre el conjunto de prueba
+existente (Ver notebook 403 para acceso a MLflow). Texto exacto del jurado para estas correcciones:
+
+  C #16: "se propone cambiar las matrices de confusión por porcentajes ya 
+         permite identificar la mejora significativa del modelo CNN-2D ya 
+         que este modelo presenta menor cantidad de datos, también es 
+         importante aclarar al lector que no esté familiarizado motivo de 
+         la reducción de datos en la matriz de confusión."
+
+  C #17: "validar la influencia real de los índices de vegetación 
+         calculados frente a las características utilizadas en el proceso"
+
+## Modelos y datos disponibles
+
+- Modelos finales registrados en MLflow:
+  - LR, SGD, LightGBM, XGBoost (ML)
+  - CNN-1D, CNN-2D (DL)
+  - run_id CNN-2D: 61a3cc05f39d46f79f2e3fa3d29fae7f
+  - bean_stress_classifier v1 en MLflow Production
+- Conjunto de prueba: split_id = 3 en el dataset zarr.
+- Vector de entrada: 58 bandas espectrales + 5 índices de vegetación 
+  (NDVI, NDRE, CIgreen, PRI, PSRI) = 63 características por píxel.
+- Para CNN-2D: parches de 5×5 píxeles centrados en cada píxel del split de 
+  prueba.
+
+## Convención de trabajo
+
+- Los entregables van en notebooks numerados que se commitean con outputs.: Crear inicialmente un script.py temporal en el cual realices tus análisis, ejécutalo y luego evalúa si la respuesta se ajusta a lo solicitado, en caso de que no o que el usuario te pida un cambio, realízalo y nuevamente verfiica. Una vez que el resultado sea verificado por ti y por el usuario procede a transformar el script .py en un notebook para que el usuario pueda ejecutar manualmente y dejar el registro, luego de eso, elimina el script .py
+- Funciones reutilizables se extraen a spectralcrop/.
+- NO se modifica tesis.docx en esta sesión. Las salidas (figuras, tablas,
+  textos) se preparan para que el usuario las integre manualmente al
+  documento.
+
+---
+
+## Paso 0 — Pre-flight (10 min)
+
+1. Lee CLAUDE.md secciones: "Pre-flight check", "Operating principles",
+   "The 20 jury corrections" (focus en #16 y #17).
+2. git status                                  # debe estar limpio
+3. .venv/Scripts/dvc status -c                 # debe decir "in sync"
+4. Verifica cargabilidad de los modelos finales:
+   - models/cnn1d_final_model_weights.pt
+   - models/cnn2d_final_model_weights.pt
+   - models de ML finales en formato .pkl o .joblib
+   - bean_stress_classifier v1 desde MLflow
+5. Crea las carpetas de salida si no existen:
+   - reports/figures/confusion_matrices_pct/
+   - reports/figures/iv_ablation/
+6. Lee los notebooks 304-jmmz-ml-binary-modeling.ipynb y
+   305-jmmz-dl-binary-modeling.ipynb para identificar dónde se generaron
+   las matrices de confusión originales (las que ya aparecen en el .docx).
+
+DETENTE y reporta el estado.
+
+---
+
+## PARTE 1 — Corrección C #16: Matrices de confusión en porcentajes
+## Estimado: 1 hora
+
+Objetivo: regenerar las matrices de confusión de los seis modelos finales
+en versión normalizada (porcentual) sobre el mismo conjunto de prueba
+utilizado en la versión actual del documento, y documentar la diferencia
+de tamaño efectivo del conjunto evaluado entre arquitecturas.
+
+### Paso 1.1 — Reconstruir las matrices originales (verificación)
+
+Antes de generar las versiones porcentuales, verifica que las matrices
+absolutas obtenidas por reproducción coinciden con las que aparecen en
+el documento. Esto es importante porque cualquier discrepancia debe
+reportarse al usuario (no asumir que son nuevas).
+
+Para cada modelo final (LR, SGD, LightGBM, XGBoost, CNN-1D, CNN-2D):
+1. Cargar el modelo desde su artefacto en MLflow o desde models/.
+2. Cargar el conjunto de prueba (split_id = 3) en la representación que
+   corresponde al modelo:
+   - ML, CNN-1D: vector de 63 features por píxel.
+   - CNN-2D: parche 5×5 × 63 canales por píxel central.
+3. Aplicar el umbral óptimo de decisión registrado en MLflow para cada
+   modelo (NO usar 0.5 fijo).
+4. Calcular la matriz de confusión 2×2 (clase 0 = sano, clase 1 = 
+   estresado).
+5. Reportar:
+   - Matriz absoluta (4 valores: TN, FP, FN, TP).
+   - Total de píxeles evaluados.
+   - Diferencia con la matriz reportada en la sección 4.3.3.3 / 4.3.4.3
+     del documento (si la hay, marcar discrepancia).
+
+### Paso 1.2 — Generar matrices porcentuales
+
+Para cada modelo, generar TRES versiones porcentuales:
+
+(a) Normalizada por fila (percent of true label) — útil para ver recall 
+    por clase. Cada fila suma 100 %.
+(b) Normalizada por columna (percent of predicted label) — útil para ver 
+    precisión por clase. Cada columna suma 100 %.
+(c) Normalizada por total (percent of all samples) — útil para ver 
+    proporciones globales. Toda la matriz suma 100 %.
+
+La versión que el jurado pide explícitamente es la (a) y/o la (c), pero 
+generar las tres permite presentar la más informativa al lector.
+
+### Paso 1.3 — Documentar reducción de datos en CNN-2D
+
+Construir una tabla comparativa que documente la diferencia de tamaño 
+efectivo del conjunto de prueba entre arquitecturas:
+
+| Arquitectura | Píxeles evaluados | % vs ML | Razón de diferencia |
+|---|---|---|---|
+
+Calcular y reportar:
+- Píxeles totales del split de prueba (los que ven los modelos ML y 
+  CNN-1D). Llamemos a esto N_total.
+- Píxeles evaluables por CNN-2D (los que tienen parche 5×5 completo y no
+  cruzan los bordes del lote ni de los polígonos etiquetados). Llamemos 
+  a esto N_2D.
+- Porcentaje N_2D / N_total.
+- Explicación textual: el CNN-2D opera sobre parches 5×5 centrados en 
+  cada píxel; los píxeles ubicados a menos de 2 posiciones del borde 
+  de un surco o de una zona de exclusión (suelo desnudo, sombra, área 
+  sin etiquetar) no pueden constituir un parche completo y por tanto 
+  quedan excluidos del conjunto evaluable.
+
+### Paso 1.4 — Visualización editorial
+
+Generar UNA figura con seis subplots (uno por modelo) presentando la 
+matriz porcentual normalizada por fila (recall por clase). Estilo:
+- Heatmap con valores en porcentaje, dos decimales.
+- Colormap secuencial (Blues o similar).
+- Anotaciones en cada celda con el valor y, entre paréntesis, el conteo 
+  absoluto correspondiente.
+- Subtítulo de cada subplot con el nombre del modelo y el total de 
+  píxeles evaluados.
+- Pie de figura sugerido: "Matrices de confusión normalizadas por fila 
+  (recall por clase) sobre el conjunto de prueba. Cada fila suma 100 %. 
+  El número de píxeles evaluados varía entre arquitecturas debido a la 
+  geometría de los parches del CNN-2D (ver sección X.X.X)."
+
+Guardar en:
+- reports/figures/confusion_matrices_pct/confusion_matrices_pct.png 
+- reports/figures/confusion_matrices_pct/confusion_matrices_pct.pdf
+Formato A4 horizontal, 300 DPI.
+
+### Paso 1.5 — Tabla numérica para integración en docx
+
+Generar tabla en CSV y MD con los valores porcentuales de las seis 
+matrices, listas para ser pegadas en el documento:
+
+reports/figures/confusion_matrices_pct/confusion_matrices_pct_summary.csv
+reports/figures/confusion_matrices_pct/confusion_matrices_pct_summary.md
+
+### Paso 1.6 — Notebook y módulo
+
+Notebook nuevo: notebooks/404-jmmz-confusion-matrices-pct.ipynb
+- Estructura: configuración → carga de modelos → reconstrucción de 
+  matrices → normalización → análisis de tamaño efectivo → visualización 
+  → guardado.
+- Commitear CON outputs.
+
+Módulo: spectralcrop/evaluation/confusion_matrices.py con funciones:
+- compute_normalized_confusion_matrices(y_true, y_pred) -> dict
+- plot_confusion_matrix_grid(matrices_dict, output_path) -> None
+- describe_evaluable_pixels_2d(test_set, patch_size=5) -> dict
+
+DETENTE y muéstrame:
+1. Las matrices porcentuales reconstruidas (versión markdown).
+2. La figura renderizada.
+3. La tabla de reducción de datos del CNN-2D.
+
+---
+
+## PARTE 2 — Corrección C #17: Validación de la influencia de los índices de vegetación
+## Estimado: 1.5 horas
+
+Objetivo: cuantificar empíricamente el aporte real de los 5 índices de 
+vegetación (NDVI, NDRE, CIgreen, PRI, PSRI) al desempeño final de los 
+modelos, frente a la información puramente espectral de las 58 bandas.
+
+Esto se hace mediante **ablación durante inferencia**, sin reentrenamiento.
+
+### Paso 2.1 — Definir el protocolo de ablación
+
+Para cada modelo final, evaluar el desempeño bajo cuatro condiciones:
+
+(C0) Todas las features (baseline reportado en el documento): 58 bandas + 
+     5 IV.
+(C1) Sin índices de vegetación: las 5 posiciones correspondientes a los IV 
+     se sustituyen por su VALOR PROMEDIO calculado sobre el conjunto de 
+     ENTRENAMIENTO. Esto es estadísticamente equivalente a "neutralizar" 
+     la contribución informativa de cada IV manteniendo la dimensionalidad 
+     del vector de entrada esperado por el modelo.
+(C2) Solo índices de vegetación: las 58 bandas espectrales se sustituyen 
+     por sus promedios del conjunto de entrenamiento. Este es el inverso 
+     de C1 y permite ver cuánta capacidad discriminativa reside 
+     exclusivamente en los IV.
+(C3) Sin un IV específico (5 sub-condiciones, una por cada IV): se 
+     neutraliza solo el IV correspondiente. Esto permite identificar la 
+     contribución individual de cada índice.
+
+CRÍTICO: el modelo NO se reentrena. La ablación opera sobre el vector de 
+entrada del conjunto de prueba durante inferencia. Los índices se 
+neutralizan por el promedio de entrenamiento, NO por ceros, para evitar 
+introducir valores fuera del dominio aprendido por el modelo.
+
+Para CNN-2D: la ablación se aplica en el canal correspondiente del parche 
+5×5, en todas las posiciones del parche (es decir, todo el canal del IV 
+correspondiente se constantea al promedio).
+
+### Paso 2.2 — Ejecutar ablación
+
+Para cada uno de los seis modelos finales y cada una de las nueve 
+condiciones (C0, C1, C2, C3.NDVI, C3.NDRE, C3.CIgreen, C3.PRI, C3.PSRI), 
+calcular sobre el conjunto de prueba:
+- PR-AUC (métrica primaria)
+- ROC-AUC
+- F1-macro
+- Recall (clase positiva)
+- Precision (clase positiva)
+- Accuracy
+
+Guardar en una tabla con las dimensiones (modelo × condición × métrica).
+
+### Paso 2.3 — Análisis y visualización
+
+Generar:
+
+(a) Tabla resumen con las condiciones C0 y C1 (con vs sin IV) para los 
+    seis modelos. Reportar diferencia absoluta y relativa en PR-AUC.
+
+(b) Figura de barras agrupadas: PR-AUC bajo C0 vs C1 vs C2 para cada 
+    modelo. Permite ver de un vistazo cuánto aportan los IV y cuánta 
+    capacidad discriminativa hay solo en los IV.
+
+(c) Heatmap de contribución individual: filas = modelos, columnas = los 
+    5 IV, valores = caída de PR-AUC al neutralizar ese IV específico 
+    (C0 - C3.IV). Permite identificar qué índice es más influyente para 
+    cada arquitectura.
+
+Guardar en:
+- reports/figures/iv_ablation/iv_ablation_summary.png|pdf (figura b)
+- reports/figures/iv_ablation/iv_individual_contribution.png|pdf (heatmap c)
+- reports/figures/iv_ablation/iv_ablation_results.csv (tabla completa)
+- reports/figures/iv_ablation/iv_ablation_summary.md (versión MD)
+
+### Paso 2.4 — Interpretación esperada
+
+Algunas observaciones a documentar:
+
+- Si la diferencia C0 vs C1 en PR-AUC es < 0,02 puntos para todos los 
+  modelos, entonces los IV aportan información REDUNDANTE con las bandas 
+  espectrales y su valor agregado es marginal (interpretación: las 58 
+  bandas seleccionadas ya contienen toda la información discriminativa).
+- Si la diferencia es 0,02–0,05 puntos, los IV aportan información 
+  COMPLEMENTARIA modesta.
+- Si la diferencia es > 0,05 puntos, los IV son informativos de manera 
+  significativa.
+- Para C2 (solo IV): si el desempeño se mantiene relativamente alto 
+  (PR-AUC > 0,75), confirma que los IV por sí solos capturan parte 
+  importante de la firma del estrés; si cae sustancialmente, indica que 
+  los IV solos son insuficientes pero útiles como complemento.
+
+NO interpretar los resultados con sesgo (ej. "los IV son muy importantes" 
+si los datos no lo respaldan). Reportar honestamente lo observado.
+
+### Paso 2.5 — Notebook y módulo
+
+Notebook nuevo: notebooks/405-jmmz-iv-ablation.ipynb
+- Estructura: configuración → carga de modelos → cálculo de promedios de 
+  entrenamiento → ejecución de las 9 condiciones × 6 modelos → análisis → 
+  visualización → guardado.
+
+Módulo: spectralcrop/evaluation/feature_ablation.py con funciones:
+- ablate_features(X, feature_indices, replacement='mean', train_stats=None)
+- evaluate_ablation_grid(model, X_test, y_test, feature_groups, threshold)
+
+DETENTE y muéstrame:
+1. La tabla resumen C0 vs C1 vs C2 para los seis modelos.
+2. Las dos figuras renderizadas.
+3. La interpretación honesta basada en los rangos definidos en Paso 2.4.
+
+---
+
+## Paso 3 — Cierre y commits
+
+Cuando todo esté verificado, propón commits separados:
+
+1. feat(eval): normalized confusion matrices and CNN-2D evaluable pixels 
+   analysis (jury #16)
+   - Add notebooks/404-jmmz-confusion-matrices-pct.ipynb
+   - Add spectralcrop/evaluation/confusion_matrices.py
+   - Generate confusion matrices in 3 normalization modes
+   - Document evaluable-pixel reduction in CNN-2D vs ML/CNN-1D
+
+2. feat(eval): vegetation indices ablation analysis (jury #17)
+   - Add notebooks/405-jmmz-iv-ablation.ipynb
+   - Add spectralcrop/evaluation/feature_ablation.py
+   - Quantify VI contribution via inference-time feature substitution
+   - 6 models × 9 conditions evaluated on test set
+
+3. chore(dvc): track new figures for jury corrections #16 and #17
+   - dvc add reports/figures/confusion_matrices_pct/
+   - dvc add reports/figures/iv_ablation/
+
+git push origin corrections-jury-2026
+.venv/Scripts/dvc push
+
+Actualiza docs/work_log.md con entrada del día.
+
+---
+
+## Reglas de la sesión
+
+- NO retrenes ningún modelo. Solo evaluación e inferencia.
+- NO modifiques reports/tesis.docx en esta sesión. Las inserciones se 
+  hacen después con el otro asistente, manualmente.
+- NO instales nuevas dependencias. sklearn, numpy, pandas, matplotlib, 
+  seaborn, torch deberían ser suficientes.
+- En la ablación de C #17: neutralizar features con PROMEDIO DE 
+  ENTRENAMIENTO, nunca con ceros (estos pueden estar fuera del dominio 
+  aprendido).
+- Para los CNN, la ablación se aplica en el canal correspondiente del 
+  parche, en TODAS las posiciones del parche.
+- Si una métrica reportada localmente no coincide con la del documento 
+  por más de 0,005 puntos, REPORTAR la discrepancia (no esconderla) y 
+  detenerte para que el usuario decida cómo proceder.
+- Si en algún momento algo no encaja con CLAUDE.md, detente y reporta.
+
+---
+
+## Entregables esperados al cierre de la sesión
+
+Para cada corrección, un paquete listo para integración manual en el 
+docx:
+
+C #16:
+- 6 matrices de confusión absolutas reconstruidas (verificación).
+- 6 matrices de confusión porcentuales (3 normalizaciones × 6 modelos).
+- 1 figura editorial con las matrices porcentuales.
+- 1 tabla de reducción de píxeles evaluables del CNN-2D (con 
+  explicación textual).
+
+C #17:
+- 1 tabla con resultados de las 9 condiciones × 6 modelos × 6 métricas.
+- 1 figura comparativa C0 vs C1 vs C2.
+- 1 heatmap de contribución individual de cada IV.
+- 1 párrafo de interpretación basado en los rangos de magnitud 
+  observados (no en suposiciones).
+
+DETENTE al final con un resumen de los entregables y espera mi 
+revisión antes de los commits finales.
+
+"""
+Análisis C#16 (matrices de confusión en %) y C#17 (ablación de índices de vegetación).
+
+Script temporal — se convierte a notebook 404 y 405 una vez verificado.
+
+Feature layout (63 canales):
+  0-4  : NDVI, NDRE, CIgreen, PRI, PSRI  (índices de vegetación)
+  5-62 : 58 bandas espectrales seleccionadas
+
+Modelos finales:
+  ML   : logreg_cv_final_model.pkl, sgd_cv_final_model.pkl,
+         lgbm_cv_final_model.pkl, xgboost_cv_final_model.pkl
+         (Pipeline con RobustScaler interno)
+  CNN-1D: Spectral1DCNN — cnn1d_final_model_weights.pt (escala externa con robust_scaler.pkl)
+  CNN-2D: SpectralSpatialCNN2D — cnn2d_final_model_weights.pt (parches 5×5, escala externa)
+
+Umbrales: recomputados del conjunto de validación (mismo algoritmo del entrenamiento).
+"""
+
+import os
+import sys
+sys.stdout.reconfigure(encoding="utf-8")
+import json
+import warnings
+import numpy as np
+import pandas as pd
+import xarray as xr
+import dask.array as da
+import rasterio
+import joblib
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, TensorDataset
+from pathlib import Path
+from sklearn.metrics import (
+    confusion_matrix, average_precision_score, roc_auc_score,
+    f1_score, precision_score, recall_score, accuracy_score,
+)
+from sklearn.preprocessing import RobustScaler
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+import seaborn as sns
+
+warnings.filterwarnings("ignore")
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+package_path = os.path.abspath(".").split(os.sep + "notebooks")[0]
+if package_path not in sys.path:
+    sys.path.insert(0, package_path)
+
+from spectralcrop.utils.path_manager import PathManager
+
+PM = PathManager()
+
+def _resolve(p):
+    if isinstance(p, list):
+        return [x for x in p if "spectralcrop" not in x][0]
+    return p
+
+INTERIM_PATH = _resolve(PM.get_abs_path_folder("interim"))
+PROCESSED_PATH = _resolve(PM.get_abs_path_folder("processed"))
+MODELS_PATH = Path(_resolve(PM.get_abs_path_folder("models")))
+REPORTS_PATH = _resolve(PM.get_abs_path_folder("reports"))
+
+FIGS_CM  = Path(REPORTS_PATH) / "figures" / "confusion_matrices_pct"
+FIGS_IV  = Path(REPORTS_PATH) / "figures" / "iv_ablation"
+FIGS_CM.mkdir(parents=True, exist_ok=True)
+FIGS_IV.mkdir(parents=True, exist_ok=True)
+
+ZARR_PATH    = INTERIM_PATH + "masked_reflectance.zarr"
+LABELS_PATH  = _resolve(PM.get_abs_path_file("labels_multiclass.tif"))
+SPLIT_PATH   = PROCESSED_PATH + "/splits/by_plot_split_id_binary.tif"
+BANDS_PATH   = _resolve(PM.get_abs_path_file("bands_selected_by_segment.csv"))
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Device: {DEVICE}")
+print(f"ZARR  : {ZARR_PATH}")
+print(f"Models: {MODELS_PATH}")
+
+# ---------------------------------------------------------------------------
+# Architectures (must match training code in notebook 305)
+# ---------------------------------------------------------------------------
+
+class Spectral1DCNN(nn.Module):
+    def __init__(self, n_classes=2, kernel_size=5, dropout=0.3):
+        super().__init__()
+        pad = kernel_size // 2
+        self.conv1 = nn.Conv1d(1, 16, kernel_size=kernel_size, padding=pad)
+        self.bn1   = nn.BatchNorm1d(16)
+        self.conv2 = nn.Conv1d(16, 32, kernel_size=kernel_size, padding=pad)
+        self.bn2   = nn.BatchNorm1d(32)
+        self.pool  = nn.AdaptiveAvgPool1d(8)
+        self.fc1   = nn.Linear(32 * 8, 64)
+        self.drop  = nn.Dropout(dropout)
+        self.fc2   = nn.Linear(64, n_classes)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = self.pool(x)
+        x = torch.flatten(x, 1)
+        x = F.relu(self.fc1(x))
+        x = self.drop(x)
+        return self.fc2(x)
+
+
+class SpectralSpatialCNN2D(nn.Module):
+    def __init__(self, n_channels=63, n_classes=2, dropout=0.3, kernel_size=3):
+        super().__init__()
+        pad = kernel_size // 2
+        self.conv1 = nn.Conv2d(n_channels, 32, kernel_size=kernel_size, padding=pad)
+        self.bn1   = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=kernel_size, padding=pad)
+        self.bn2   = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=kernel_size, padding=pad)
+        self.bn3   = nn.BatchNorm2d(128)
+        self.pool  = nn.AdaptiveAvgPool2d((2, 2))
+        self.fc1   = nn.Linear(128 * 2 * 2, 128)
+        self.drop  = nn.Dropout(dropout)
+        self.fc2   = nn.Linear(128, n_classes)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = self.pool(x)
+        x = torch.flatten(x, 1)
+        x = F.relu(self.fc1(x))
+        x = self.drop(x)
+        return self.fc2(x)
+
+
+# ---------------------------------------------------------------------------
+# 1. Load data
+# ---------------------------------------------------------------------------
+print("\n=== 1. Loading data from zarr ===")
+ds = xr.open_zarr(ZARR_PATH, chunks={"band": 64, "y": 512, "x": 512})
+
+# Vegetation indices (5) + selected spectral bands (58) = 63 features
+bands_df = pd.read_csv(BANDS_PATH)
+selected_bands = bands_df["band_index"].tolist()
+
+indices_da = ds[["NDVI", "NDRE", "CIgreen", "PRI", "PSRI"]].to_array(dim="band")
+reflectance_selected = ds["reflectance"].isel(band=selected_bands)
+
+features_stack = xr.concat([indices_da, reflectance_selected], dim="band")
+features_stack = features_stack.transpose("y", "x", "band")
+
+VI_NAMES = ["NDVI", "NDRE", "CIgreen", "PRI", "PSRI"]
+VI_INDICES = list(range(5))          # positions 0-4
+SPECTRAL_INDICES = list(range(5, 63)) # positions 5-62
+
+print(f"Feature cube shape: {features_stack.sizes}")
+print(f"VI positions: {VI_INDICES} -> {VI_NAMES}")
+
+# Labels (binary)
+with rasterio.open(LABELS_PATH) as src:
+    labels_raw = src.read(1)
+labels_bin = np.where(labels_raw == 0, 0,
+             np.where(np.isin(labels_raw, [1, 2, 3]), 1, np.nan))
+
+# Split
+with rasterio.open(SPLIT_PATH) as src:
+    split_map = src.read(1)
+
+# Build flat feature matrix (all valid pixels)
+veg_mask   = ds["veg_mask"].astype("bool")
+nodata_mask = ds["mask_nodata"]
+valid_mask = (veg_mask & (nodata_mask == 0)).compute().values
+
+X_cube = features_stack.values  # (H, W, 63), may have NaN
+H, W, B = X_cube.shape
+
+# Flatten
+X2 = X_cube.reshape(-1, B)
+labels_flat = labels_bin.reshape(-1, 1)
+split_flat  = np.where(split_map == 0, np.nan, split_map.astype(float)).reshape(-1, 1)
+data_full   = np.concatenate([X2, labels_flat, split_flat], axis=1)
+
+df_full = pd.DataFrame(data_full).dropna(axis=0, how="any")
+df_full.rename(columns={df_full.columns[-2]: "label", df_full.columns[-1]: "split"}, inplace=True)
+
+X_all = df_full.drop(columns=["label", "split"]).values
+y_all = df_full["label"].values
+split_all = df_full["split"].values
+
+X_train = X_all[split_all == 1]
+y_train  = y_all[split_all == 1]
+X_val    = X_all[split_all == 2]
+y_val    = y_all[split_all == 2]
+X_test   = X_all[split_all == 3]
+y_test   = y_all[split_all == 3]
+
+print(f"train={len(X_train):,}  val={len(X_val):,}  test={len(X_test):,}")
+print(f"test class balance: 0={int((y_test==0).sum()):,}  1={int((y_test==1).sum()):,}")
+
+# CNN-2D scaled cube (scaler fitted on train)
+scaler_ext = joblib.load(MODELS_PATH / "robust_scaler.pkl")
+cube_scaled = scaler_ext.transform(X_cube.reshape(-1, B)).reshape(H, W, B)
+
+# Training mean in original feature space (for ablation neutralization)
+TRAIN_MEAN_ORIG = X_train.mean(axis=0)  # shape (63,)
+
+# Training mean in SCALED space (needed for CNN-2D ablation on the scaled cube)
+TRAIN_MEAN_SCALED = scaler_ext.transform(TRAIN_MEAN_ORIG.reshape(1, -1)).flatten()
+
+print(f"\nTrain mean for VI features (original space):")
+for i, name in enumerate(VI_NAMES):
+    print(f"  {name}: {TRAIN_MEAN_ORIG[i]:.4f}")
+
+# ---------------------------------------------------------------------------
+# 2. Build CNN-2D patches
+# ---------------------------------------------------------------------------
+def build_patch_dataset(cube: np.ndarray, labels_2d: np.ndarray,
+                         split_2d: np.ndarray, split_value: int, patch: int = 5):
+    """Extract patch dataset for CNN-2D. Excludes border pixels and NaN patches."""
+    Hc, Wc, Bc = cube.shape
+    r = patch // 2
+    X_list, y_list = [], []
+    for i in range(r, Hc - r):
+        for j in range(r, Wc - r):
+            if split_2d[i, j] != split_value:
+                continue
+            if np.isnan(labels_2d[i, j]):
+                continue
+            patch_cube = cube[i-r:i+r+1, j-r:j+r+1, :]
+            if np.isnan(patch_cube).any():
+                continue
+            X_list.append(np.transpose(patch_cube, (2, 0, 1)))  # (B, p, p)
+            y_list.append(labels_2d[i, j])
+    return np.stack(X_list), np.array(y_list, dtype=np.int64)
+
+PATCH = 5
+print("\n=== Building CNN-2D patch datasets ===")
+X_train2d, y_train2d = build_patch_dataset(cube_scaled, labels_bin, split_map, 1, PATCH)
+X_val2d,   y_val2d   = build_patch_dataset(cube_scaled, labels_bin, split_map, 2, PATCH)
+X_test2d,  y_test2d  = build_patch_dataset(cube_scaled, labels_bin, split_map, 3, PATCH)
+
+print(f"train2d={len(X_train2d):,}  val2d={len(X_val2d):,}  test2d={len(X_test2d):,}")
+
+# ---------------------------------------------------------------------------
+# 3. Load models
+# ---------------------------------------------------------------------------
+print("\n=== 3. Loading models ===")
+
+ml_files = {
+    "LogisticRegression": "logreg_cv_final_model.pkl",
+    "SGDClassifier":      "sgd_cv_final_model.pkl",
+    "LightGBM":           "lgbm_cv_final_model.pkl",
+    "XGBoost":            "xgboost_cv_final_model.pkl",
+}
+ml_models = {name: joblib.load(MODELS_PATH / fname) for name, fname in ml_files.items()}
+
+# CNN-1D
+with open(MODELS_PATH / "cnn1d_final_model_info.json") as f:
+    info1d = json.load(f)
+model1d = Spectral1DCNN(n_classes=2, kernel_size=info1d["kernel_size"], dropout=info1d["dropout"]).to(DEVICE)
+model1d.load_state_dict(torch.load(MODELS_PATH / "cnn1d_final_model_weights.pt", map_location=DEVICE, weights_only=False))
+model1d.eval()
+THR_1D = info1d["best_thr"]
+
+# CNN-2D
+with open(MODELS_PATH / "cnn2d_final_model_info.json") as f:
+    info2d = json.load(f)
+model2d = SpectralSpatialCNN2D(
+    n_channels=info2d["n_channels"], n_classes=2,
+    kernel_size=info2d["kernel_size"], dropout=info2d["dropout"],
+).to(DEVICE)
+model2d.load_state_dict(torch.load(MODELS_PATH / "cnn2d_final_model_weights.pt", map_location=DEVICE, weights_only=False))
+model2d.eval()
+THR_2D = info2d["best_thr"]
+
+print(f"CNN-1D best_thr={THR_1D:.4f}")
+print(f"CNN-2D best_thr={THR_2D:.4f}")
+
+# ---------------------------------------------------------------------------
+# 4. Compute optimal thresholds for ML models (recomputed from val set)
+# ---------------------------------------------------------------------------
+def find_best_thr(y_true: np.ndarray, y_prob: np.ndarray) -> float:
+    grid = np.linspace(0.10, 0.90, 161)
+    return max(grid, key=lambda t: f1_score(y_true, (y_prob >= t).astype(int), average="macro"))
+
+print("\n=== 4. Computing ML thresholds from validation set ===")
+ml_thresholds = {}
+for name, pipe in ml_models.items():
+    p_val = pipe.predict_proba(X_val)[:, 1]
+    thr = find_best_thr(y_val, p_val)
+    ml_thresholds[name] = thr
+    print(f"  {name}: best_thr={thr:.4f}")
+
+# CNN-1D val threshold verification
+def predict_proba_1d(model, X: np.ndarray, batch_size=512) -> np.ndarray:
+    model.eval()
+    probs = []
+    Xt = torch.from_numpy(X.astype(np.float32)).unsqueeze(1)  # (N,1,L)
+    with torch.no_grad():
+        for i in range(0, len(Xt), batch_size):
+            logits = model(Xt[i:i+batch_size].to(DEVICE))
+            prob   = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
+            probs.extend(prob)
+    return np.array(probs)
+
+def predict_proba_2d(model, X: np.ndarray, batch_size=256) -> np.ndarray:
+    model.eval()
+    probs = []
+    Xt = torch.from_numpy(X.astype(np.float32))
+    with torch.no_grad():
+        for i in range(0, len(Xt), batch_size):
+            logits = model(Xt[i:i+batch_size].to(DEVICE))
+            prob   = torch.softmax(logits, dim=1)[:, 1].cpu().numpy()
+            probs.extend(prob)
+    return np.array(probs)
+
+# Use external-scaled data for CNN models
+X_val_scaled   = scaler_ext.transform(X_val)
+X_test_scaled  = scaler_ext.transform(X_test)
+X_train_scaled = scaler_ext.transform(X_train)
+
+p_val_1d = predict_proba_1d(model1d, X_val_scaled)
+thr_1d_recomputed = find_best_thr(y_val, p_val_1d)
+print(f"  CNN-1D recomputed thr={thr_1d_recomputed:.4f}  (stored={THR_1D:.4f})")
+
+# ---------------------------------------------------------------------------
+# 5. Generate predictions — all 6 models
+# ---------------------------------------------------------------------------
+print("\n=== 5. Generating predictions on test set ===")
+
+MODEL_ORDER = ["LogisticRegression", "SGDClassifier", "LightGBM", "XGBoost", "CNN-1D", "CNN-2D"]
+
+# ML models
+ml_probs_test = {name: pipe.predict_proba(X_test)[:, 1] for name, pipe in ml_models.items()}
+ml_preds_test = {name: (p >= ml_thresholds[name]).astype(int) for name, p in ml_probs_test.items()}
+
+# CNN-1D (uses externally scaled data)
+p_test_1d = predict_proba_1d(model1d, X_test_scaled)
+y_pred_1d = (p_test_1d >= THR_1D).astype(int)
+
+# CNN-2D (uses patches from scaled cube)
+p_test_2d = predict_proba_2d(model2d, X_test2d)
+y_pred_2d = (p_test_2d >= THR_2D).astype(int)
+
+all_probs  = {**ml_probs_test, "CNN-1D": p_test_1d,  "CNN-2D": p_test_2d}
+all_preds  = {**ml_preds_test, "CNN-1D": y_pred_1d,  "CNN-2D": y_pred_2d}
+all_ytrue  = {m: y_test for m in MODEL_ORDER[:5]}
+all_ytrue["CNN-2D"] = y_test2d
+
+all_n_test = {m: len(all_ytrue[m]) for m in MODEL_ORDER}
+print("Test set sizes:")
+for m in MODEL_ORDER:
+    print(f"  {m}: {all_n_test[m]:,}")
+
+# ---------------------------------------------------------------------------
+# 6. C#16 — Confusion matrices (absolute + 3 normalizations)
+# ---------------------------------------------------------------------------
+print("\n=== 6. C#16 — Confusion matrices ===")
+
+cms_abs = {}
+cms_row = {}   # recall per class (row normalized)
+cms_col = {}   # precision per class (col normalized)
+cms_tot = {}   # % of all samples
+
+for m in MODEL_ORDER:
+    cm = confusion_matrix(all_ytrue[m], all_preds[m])
+    cms_abs[m] = cm
+    cms_row[m] = cm.astype(float) / cm.sum(axis=1, keepdims=True) * 100
+    cms_col[m] = cm.astype(float) / cm.sum(axis=0, keepdims=True) * 100
+    cms_tot[m] = cm.astype(float) / cm.sum() * 100
+
+    tn, fp, fn, tp = cm.ravel()
+    pr_auc = average_precision_score(all_ytrue[m], all_probs[m])
+    print(f"\n  {m}  (n={all_n_test[m]:,})")
+    print(f"    TN={tn:,}  FP={fp:,}  FN={fn:,}  TP={tp:,}")
+    print(f"    Row-norm: TN%={cms_row[m][0,0]:.2f}  FP%={cms_row[m][0,1]:.2f}  FN%={cms_row[m][1,0]:.2f}  TP%={cms_row[m][1,1]:.2f}")
+    print(f"    PR-AUC={pr_auc:.4f}")
+
+# ---------------------------------------------------------------------------
+# 6.1 Figure: row-normalized confusion matrices
+# ---------------------------------------------------------------------------
+print("\n=== 6.1 Plotting confusion matrix grid ===")
+
+CLASS_LABELS = ["Sano (0)", "Estresado (1)"]
+fig, axes = plt.subplots(2, 3, figsize=(16, 10))
+axes = axes.flatten()
+
+for ax, m in zip(axes, MODEL_ORDER):
+    cm_abs = cms_abs[m]
+    cm_pct = cms_row[m]
+    n_eval = all_n_test[m]
+
+    annot = np.empty((2, 2), dtype=object)
+    for r in range(2):
+        for c in range(2):
+            annot[r, c] = f"{cm_pct[r, c]:.2f}%\n({cm_abs[r, c]:,})"
+
+    sns.heatmap(
+        cm_pct, ax=ax, annot=annot, fmt="", cmap="Blues",
+        vmin=0, vmax=100,
+        xticklabels=CLASS_LABELS, yticklabels=CLASS_LABELS,
+        linewidths=0.5, linecolor="gray",
+        cbar_kws={"shrink": 0.7, "label": "%"},
+    )
+    ax.set_title(f"{m}\n(n evaluados = {n_eval:,})", fontsize=10, fontweight="bold")
+    ax.set_xlabel("Predicho", fontsize=9)
+    ax.set_ylabel("Real", fontsize=9)
+    ax.tick_params(axis="both", labelsize=8)
+
+fig.suptitle(
+    "Matrices de confusión normalizadas por fila (recall por clase) — conjunto de prueba\n"
+    "Cada fila suma 100 %. Entre paréntesis: conteo absoluto.",
+    fontsize=11, fontweight="bold", y=1.01,
+)
+plt.tight_layout()
+
+for ext in ("png", "pdf"):
+    out = FIGS_CM / f"confusion_matrices_pct.{ext}"
+    fig.savefig(out, dpi=300, bbox_inches="tight")
+    print(f"  Saved: {out}")
+plt.close()
+
+# ---------------------------------------------------------------------------
+# 6.2 Pixel reduction table (CNN-2D vs ML/CNN-1D)
+# ---------------------------------------------------------------------------
+n_total = all_n_test["LogisticRegression"]  # same for ML + CNN-1D
+n_2d    = all_n_test["CNN-2D"]
+pct_2d  = n_2d / n_total * 100
+
+pixel_table = pd.DataFrame([
+    {"Arquitectura": "ML (LR / SGD / LightGBM / XGBoost)", "Pixeles evaluados": n_total, "Pct vs ML": "100.00%",
+     "Razon": "Vector plano, todos los px validos del split 3"},
+    {"Arquitectura": "CNN-1D",                              "Pixeles evaluados": n_total, "Pct vs ML": "100.00%",
+     "Razon": "Vector plano, todos los px validos del split 3"},
+    {"Arquitectura": "CNN-2D",                              "Pixeles evaluados": n_2d,    "Pct vs ML": f"{pct_2d:.2f}%",
+     "Razon": "Parches 5x5: excluye ~2 px del borde + px con NaN en vecindad"},
+])
+
+print("\n--- Pixel reduction table ---")
+print(pixel_table.to_string(index=False))
+pixel_table.to_csv(FIGS_CM / "pixel_reduction_table.csv", index=False)
+
+# ---------------------------------------------------------------------------
+# 6.3 Summary table (CSV + MD)
+# ---------------------------------------------------------------------------
+rows = []
+for m in MODEL_ORDER:
+    cm = cms_abs[m]
+    cr = cms_row[m]
+    pr = average_precision_score(all_ytrue[m], all_probs[m])
+    roc = roc_auc_score(all_ytrue[m], all_probs[m])
+    rows.append({
+        "Modelo": m,
+        "N_test": all_n_test[m],
+        "TN": int(cm[0,0]), "FP": int(cm[0,1]),
+        "FN": int(cm[1,0]), "TP": int(cm[1,1]),
+        "TNR (recall_0) %": round(cr[0,0], 2),
+        "FPR %":            round(cr[0,1], 2),
+        "FNR %":            round(cr[1,0], 2),
+        "TPR (recall_1) %": round(cr[1,1], 2),
+        "PR-AUC": round(pr, 4),
+        "ROC-AUC": round(roc, 4),
+    })
+df_cm_summary = pd.DataFrame(rows)
+df_cm_summary.to_csv(FIGS_CM / "confusion_matrices_pct_summary.csv", index=False)
+
+# Markdown
+md_lines = ["# Matrices de confusión normalizadas — Corrección C #16", "",
+            "Normalización por fila (recall por clase). Cada fila suma 100 %.", "",
+            df_cm_summary.to_markdown(index=False)]
+(FIGS_CM / "confusion_matrices_pct_summary.md").write_text("\n".join(md_lines), encoding="utf-8")
+print(f"\nSummary saved to {FIGS_CM}")
+
+# ---------------------------------------------------------------------------
+# 7. C#17 — Vegetation Index Ablation
+# ---------------------------------------------------------------------------
+print("\n\n=== 7. C#17 — Vegetation Index Ablation ===")
+
+METRICS = ["PR-AUC", "ROC-AUC", "F1-macro", "Recall_1", "Precision_1", "Accuracy"]
+
+def compute_metrics(y_true, y_prob, thr):
+    y_pred = (y_prob >= thr).astype(int)
+    return {
+        "PR-AUC":      round(average_precision_score(y_true, y_prob), 4),
+        "ROC-AUC":     round(roc_auc_score(y_true, y_prob), 4),
+        "F1-macro":    round(f1_score(y_true, y_pred, average="macro"), 4),
+        "Recall_1":    round(recall_score(y_true, y_pred), 4),
+        "Precision_1": round(precision_score(y_true, y_pred, zero_division=0), 4),
+        "Accuracy":    round(accuracy_score(y_true, y_pred), 4),
+    }
+
+
+def ablate_and_predict_ml(pipe, X_test_orig, X_train_orig, ablate_indices):
+    """
+    Neutralize selected feature indices by setting them to their training mean
+    in ORIGINAL (unscaled) space, then pass through the pipeline.
+    """
+    X_abl = X_test_orig.copy()
+    for idx in ablate_indices:
+        X_abl[:, idx] = X_train_orig[:, idx].mean()
+    return pipe.predict_proba(X_abl)[:, 1]
+
+
+def ablate_and_predict_1d(model, X_test_scaled, X_train_scaled, ablate_indices, thr, batch=512):
+    """
+    Neutralize in SCALED space (post-scaling mean replacement for DL models).
+    For CNN-1D, features are 1D vectors.
+    """
+    X_abl = X_test_scaled.copy()
+    for idx in ablate_indices:
+        X_abl[:, idx] = X_train_scaled[:, idx].mean()
+    return predict_proba_1d(model, X_abl, batch_size=batch)
+
+
+def ablate_and_predict_2d(model, X_test_patches, cube_scaled, labels_bin, split_map,
+                           X_train_scaled, ablate_indices, thr, patch=5, batch=256):
+    """
+    Neutralize a channel in the scaled cube, rebuild patches, predict.
+    """
+    cube_abl = cube_scaled.copy()
+    H, W, B = cube_abl.shape
+    for idx in ablate_indices:
+        channel_train_mean = X_train_scaled[:, idx].mean()
+        cube_abl[:, :, idx] = channel_train_mean
+    X_abl, y_abl = build_patch_dataset(cube_abl, labels_bin, split_map, 3, patch)
+    return predict_proba_2d(model, X_abl, batch_size=batch), y_abl
+
+
+# Conditions:
+#  C0 = baseline (all features)
+#  C1 = no VIs (ablate indices 0-4)
+#  C2 = only VIs (ablate spectral bands 5-62)
+#  C3.NDVI ... C3.PSRI = ablate single VI
+
+CONDITIONS = {
+    "C0_all":      [],
+    "C1_no_VI":    VI_INDICES,
+    "C2_only_VI":  SPECTRAL_INDICES,
+    "C3_no_NDVI":  [0],
+    "C3_no_NDRE":  [1],
+    "C3_no_CIg":   [2],
+    "C3_no_PRI":   [3],
+    "C3_no_PSRI":  [4],
+}
+
+COND_LABELS = {
+    "C0_all":     "C0: todas",
+    "C1_no_VI":   "C1: sin IV",
+    "C2_only_VI": "C2: solo IV",
+    "C3_no_NDVI": "C3: sin NDVI",
+    "C3_no_NDRE": "C3: sin NDRE",
+    "C3_no_CIg":  "C3: sin CIgreen",
+    "C3_no_PRI":  "C3: sin PRI",
+    "C3_no_PSRI": "C3: sin PSRI",
+}
+
+ablation_results = []  # list of dicts
+
+for cond_key, ablate_idx in CONDITIONS.items():
+    print(f"\n  Condition: {cond_key}  (ablate features: {ablate_idx})")
+
+    for model_name in MODEL_ORDER:
+        if model_name in ml_models:
+            pipe = ml_models[model_name]
+            thr = ml_thresholds[model_name]
+            if len(ablate_idx) == 0:
+                p = pipe.predict_proba(X_test)[:, 1]
+            else:
+                p = ablate_and_predict_ml(pipe, X_test, X_train, ablate_idx)
+            y_true = y_test
+
+        elif model_name == "CNN-1D":
+            thr = THR_1D
+            if len(ablate_idx) == 0:
+                p = predict_proba_1d(model1d, X_test_scaled)
+            else:
+                p = ablate_and_predict_1d(model1d, X_test_scaled, X_train_scaled, ablate_idx, thr)
+            y_true = y_test
+
+        else:  # CNN-2D
+            thr = THR_2D
+            if len(ablate_idx) == 0:
+                p = p_test_2d  # already computed
+                y_true = y_test2d
+            else:
+                p, y_true = ablate_and_predict_2d(
+                    model2d, X_test2d, cube_scaled, labels_bin, split_map,
+                    X_train_scaled, ablate_idx, thr, PATCH,
+                )
+
+        metrics = compute_metrics(y_true, p, thr)
+        row = {"Modelo": model_name, "Condicion": cond_key, **metrics}
+        ablation_results.append(row)
+        print(f"    {model_name}: PR-AUC={metrics['PR-AUC']:.4f}")
+
+df_ablation = pd.DataFrame(ablation_results)
+df_ablation.to_csv(FIGS_IV / "iv_ablation_results.csv", index=False)
+print(f"\nAblation table saved: {FIGS_IV / 'iv_ablation_results.csv'}")
+
+# ---------------------------------------------------------------------------
+# 7.1 Summary table C0 vs C1 vs C2
+# ---------------------------------------------------------------------------
+df_c012 = df_ablation[df_ablation["Condicion"].isin(["C0_all", "C1_no_VI", "C2_only_VI"])].copy()
+pivot_c012 = df_c012.pivot(index="Modelo", columns="Condicion", values="PR-AUC").reindex(MODEL_ORDER)
+pivot_c012.columns.name = None
+
+pivot_c012["Delta_C0_C1 (C0-C1)"] = (pivot_c012["C0_all"] - pivot_c012["C1_no_VI"]).round(4)
+pivot_c012["Delta%_C0_C1"] = ((pivot_c012["Delta_C0_C1 (C0-C1)"] / pivot_c012["C0_all"]) * 100).round(2)
+
+print("\n--- Summary C0 vs C1 vs C2 (PR-AUC) ---")
+print(pivot_c012.to_string())
+
+pivot_c012.to_csv(FIGS_IV / "iv_ablation_summary.csv")
+
+md_c012 = [
+    "# Ablación de índices de vegetación — Corrección C #17",
+    "",
+    "## Tabla resumen PR-AUC: C0 (todas) vs C1 (sin IV) vs C2 (solo IV)",
+    "",
+    pivot_c012.reset_index().to_markdown(index=False),
+    "",
+    "**Interpretación de magnitudes:**",
+    "- ΔPR-AUC < 0.02 → IV aportan información REDUNDANTE con las bandas (aporte marginal)",
+    "- 0.02 ≤ ΔPR-AUC < 0.05 → IV aportan información COMPLEMENTARIA modesta",
+    "- ΔPR-AUC ≥ 0.05 → IV son informativos de manera significativa",
+]
+(FIGS_IV / "iv_ablation_summary.md").write_text("\n".join(md_c012), encoding="utf-8")
+
+# ---------------------------------------------------------------------------
+# 7.2 Figure A: grouped bar chart C0 vs C1 vs C2
+# ---------------------------------------------------------------------------
+COLORS = {"C0_all": "#2196F3", "C1_no_VI": "#FF9800", "C2_only_VI": "#4CAF50"}
+LABELS_CONDS = {"C0_all": "C0: todas (58 bandas + 5 IV)", "C1_no_VI": "C1: sin IV (solo bandas)", "C2_only_VI": "C2: solo IV (5 índices)"}
+
+x = np.arange(len(MODEL_ORDER))
+width = 0.25
+
+fig, ax = plt.subplots(figsize=(13, 6))
+for k, (cond, color) in enumerate(COLORS.items()):
+    vals = [df_ablation[(df_ablation.Modelo == m) & (df_ablation.Condicion == cond)]["PR-AUC"].values[0]
+            for m in MODEL_ORDER]
+    bars = ax.bar(x + (k - 1) * width, vals, width, label=LABELS_CONDS[cond], color=color, alpha=0.85, edgecolor="white")
+    for bar, v in zip(bars, vals):
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.005, f"{v:.3f}",
+                ha="center", va="bottom", fontsize=7.5, fontweight="bold")
+
+ax.set_xticks(x)
+ax.set_xticklabels(MODEL_ORDER, fontsize=10)
+ax.set_ylim(0, 1.08)
+ax.set_ylabel("PR-AUC (conjunto de prueba)", fontsize=11)
+ax.set_title(
+    "Contribución de los índices de vegetación al desempeño — Ablación por inferencia\n"
+    "C0: todas las características | C1: sin IV | C2: solo IV",
+    fontsize=11, fontweight="bold",
+)
+ax.legend(fontsize=9, loc="lower right")
+ax.grid(axis="y", alpha=0.3)
+ax.axhline(0.75, color="red", linestyle="--", linewidth=0.8, alpha=0.5, label="Umbral referencia 0.75")
+
+plt.tight_layout()
+for ext in ("png", "pdf"):
+    fig.savefig(FIGS_IV / f"iv_ablation_summary.{ext}", dpi=300, bbox_inches="tight")
+plt.close()
+print(f"Bar chart saved: {FIGS_IV / 'iv_ablation_summary.png'}")
+
+# ---------------------------------------------------------------------------
+# 7.3 Figure B: heatmap individual VI contribution (C0 - C3.VI)
+# ---------------------------------------------------------------------------
+vi_contrib = np.zeros((len(MODEL_ORDER), len(VI_NAMES)))
+
+for i, m in enumerate(MODEL_ORDER):
+    c0_val = df_ablation[(df_ablation.Modelo == m) & (df_ablation.Condicion == "C0_all")]["PR-AUC"].values[0]
+    for j, vname in enumerate(VI_NAMES):
+        cond_key = f"C3_no_{['NDVI','NDRE','CIg','PRI','PSRI'][j]}"
+        c3_val = df_ablation[(df_ablation.Modelo == m) & (df_ablation.Condicion == cond_key)]["PR-AUC"].values[0]
+        vi_contrib[i, j] = round(c0_val - c3_val, 4)
+
+df_heatmap = pd.DataFrame(vi_contrib, index=MODEL_ORDER, columns=VI_NAMES)
+print("\n--- Individual VI contribution (ΔPR-AUC = C0 - C3.VI) ---")
+print(df_heatmap.to_string())
+
+fig, ax = plt.subplots(figsize=(9, 5))
+sns.heatmap(
+    df_heatmap, ax=ax, annot=True, fmt=".4f", cmap="RdYlGn",
+    center=0, vmin=-0.05, vmax=0.05,
+    linewidths=0.5, linecolor="gray",
+    cbar_kws={"label": "ΔPR-AUC (C0 − C3.IV)", "shrink": 0.8},
+)
+ax.set_title(
+    "Contribución individual de cada índice de vegetación\n"
+    "ΔPR-AUC = PR-AUC(C0) − PR-AUC(C3.IV)  |  Positivo = el IV aporta; Negativo = el IV perjudica",
+    fontsize=10, fontweight="bold",
+)
+ax.set_xlabel("Índice de vegetación", fontsize=10)
+ax.set_ylabel("Modelo", fontsize=10)
+plt.tight_layout()
+for ext in ("png", "pdf"):
+    fig.savefig(FIGS_IV / f"iv_individual_contribution.{ext}", dpi=300, bbox_inches="tight")
+plt.close()
+print(f"Heatmap saved: {FIGS_IV / 'iv_individual_contribution.png'}")
+
+# ---------------------------------------------------------------------------
+# 8. Summary printout
+# ---------------------------------------------------------------------------
+print("\n\n" + "="*70)
+print("RESUMEN FINAL")
+print("="*70)
+
+print("\n--- C#16: Matrices absolutas reconstruidas ---")
+for m in MODEL_ORDER:
+    cm = cms_abs[m]
+    print(f"  {m}: [[{cm[0,0]:,}, {cm[0,1]:,}], [{cm[1,0]:,}, {cm[1,1]:,}]]  (n={all_n_test[m]:,})")
+
+print(f"\n--- C#16: Reducción CNN-2D ---")
+print(f"  ML/CNN-1D: {n_total:,} px | CNN-2D: {n_2d:,} px ({pct_2d:.2f}%)")
+
+print("\n--- C#17: PR-AUC C0 vs C1 vs C2 ---")
+print(pivot_c012[["C0_all","C1_no_VI","C2_only_VI","Delta_C0_C1 (C0-C1)","Delta%_C0_C1"]].to_string())
+
+print("\n--- C#17: Individual VI contribution (ΔPR-AUC) ---")
+print(df_heatmap.to_string())
+
+print("\nAll files written to:")
+print(f"  {FIGS_CM}")
+print(f"  {FIGS_IV}")
