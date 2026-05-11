@@ -201,6 +201,7 @@ cython_debug/
 !docs/model_architecture.png
 !reports/Propuesta Trabajo Final.pdf
 !reports/tesis.docx
+!reports/carta_respuesta_jurado.docx
 !references/theses/*.pdf
 !references/papers/*.pdf
 
