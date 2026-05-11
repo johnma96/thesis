@@ -229,3 +229,4 @@ models/*
 data/raw/
 data/processed/zarr
 /models
+docs/prompt_asistente.md
