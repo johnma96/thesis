@@ -39,8 +39,8 @@ Agradezco al jurado evaluador la rigurosidad y profundidad de las observaciones 
 | 13 | Caso práctico: parcelas con plantas mixtas | Discusión | **Atendida** | §4.6 |
 | 14 | Reestructuración de conclusiones | Estructura | **Atendida** | §5.1 |
 | 15 | Trabajo futuro: validación ante otros estreses y genotipos | Estructura | **Atendida** | §5.2 |
-| 16 | Matrices de confusión en porcentajes y reducción de datos | Análisis | **Atendida** | §4.3.4.3 |
-| 17 | Influencia real de los índices de vegetación | Análisis | **Atendida** | §4.3.5 |
+| 16 | Matrices de confusión en porcentajes y reducción de datos | Análisis | **Atendida** | §4.3.5 |
+| 17 | Influencia real de los índices de vegetación | Análisis | **Atendida** | §4.3.6 |
 | 18 | Métricas de costo computacional para modelos DL | Análisis | **Atendida** | §4.4.1 |
 | 19 | Diagrama del diseño experimental | Análisis | **Atendida** | §3.1.1 |
 | 20 | Riesgo de aprendizaje de estructura espacial en CNN-2D | Modelado | **Atendida** | §4.5 |
@@ -346,7 +346,7 @@ Se reconoce que la limitación más relevante para parcelas mixtas no proviene d
 
 ### Descripción de las modificaciones realizadas
 
-Se incorporó al final de §4.3.4.3 "Análisis de las matrices de confusión" un análisis comparativo en términos porcentuales de los seis modelos finales, acompañado de una nueva figura editorial con seis paneles (uno por modelo) que presenta las matrices normalizadas por fila (recall por clase).
+Se incorporó al final de §4.3.5 "Análisis de las matrices de confusión" un análisis comparativo en términos porcentuales de los seis modelos finales, acompañado de una nueva figura editorial con seis paneles (uno por modelo) que presenta las matrices normalizadas por fila (recall por clase).
 
 **Justificación de la representación porcentual.** Se argumenta que la normalización por fila desacopla la lectura de la magnitud absoluta de cada clase, lo cual es recomendado en problemas con desbalance de clases.
 
@@ -360,7 +360,7 @@ Se incorporó al final de §4.3.4.3 "Análisis de las matrices de confusión" un
 
 ### Ubicación en el documento
 
-- §4.3.4.3 "Análisis de las matrices de confusión" — bloque final con análisis y Figura 4-10.
+- §4.3.5 "Análisis de las matrices de confusión" — bloque final con análisis y Figura 4-10.
 
 ---
 
@@ -372,7 +372,7 @@ Se incorporó al final de §4.3.4.3 "Análisis de las matrices de confusión" un
 
 ### Descripción de las modificaciones realizadas
 
-Se incorporó al Capítulo 4 una nueva subsección **§4.3.5 "Validación empírica del aporte de los índices de vegetación"**, dedicada a cuantificar el aporte real de los cinco índices de vegetación (NDVI, NDRE, CIgreen, PRI, PSRI) frente a las 58 bandas espectrales seleccionadas. El análisis se realizó mediante ablación en tiempo de inferencia, sin reentrenamiento.
+Se incorporó al Capítulo 4 una nueva subsección **§4.3.6 "Validación empírica del aporte de los índices de vegetación"**, dedicada a cuantificar el aporte real de los cinco índices de vegetación (NDVI, NDRE, CIgreen, PRI, PSRI) frente a las 58 bandas espectrales seleccionadas. El análisis se realizó mediante ablación en tiempo de inferencia, sin reentrenamiento.
 
 **Protocolo metodológico.** Para cada uno de los seis modelos finales sobre el conjunto de prueba, se evaluó el desempeño bajo tres configuraciones principales:
 - **C0 (línea base):** todas las características disponibles (58 bandas + 5 IV).
@@ -402,7 +402,7 @@ Adicionalmente, se evaluaron cinco subcondiciones que neutralizan un solo IV a l
 
 ### Ubicación en el documento
 
-- §4.3.5 "Validación empírica del aporte de los índices de vegetación" — subsección nueva con Tabla 4-4 y Figuras 4-11 y 4-12.
+- §4.3.6 "Validación empírica del aporte de los índices de vegetación" — subsección nueva con Tabla 4-4 y Figuras 4-11 y 4-12.
 
 ---
 
