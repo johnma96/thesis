@@ -313,7 +313,7 @@ model2d.eval()
 - **No automated test suite exists**
 
 **Key document locations**
-- Thesis document (latest `.docx`, ground truth): `reports/tesis.docx`
+- Thesis document (latest `.docx`, ground truth): `reports/Trabajo Final John Montoya.docx`
 - Jury-annotated PDF: `reports/pdfs/Trabajo Final de Maestría John Montoya (23-02-2026) - Observaciones Manuel Goez.pdf`
 - Jury observations PDF (original): `docs/thesis_corrections/Observaciones TFM John Montoya (23-02-2026) - Manuel Goez.pdf`
 - `jury_observations.md`: **NOT YET CREATED** — to be done in Sprint 1
@@ -349,7 +349,7 @@ model2d.eval()
 │   ├── visualization/
 │   └── utils/
 ├── reports/
-│   ├── tesis.docx            # ← THESIS GROUND TRUTH (corrections applied here)
+│   ├── Trabajo Final John Montoya.docx  # THESIS GROUND TRUTH — not tracked in git (use PDF)
 │   ├── figures/
 │   └── pdfs/                 # jury-annotated PDF lives here
 ├── references/               # papers, technical reports, annexes
@@ -363,7 +363,7 @@ model2d.eval()
 └── run.sh
 ```
 
-**The thesis ground truth is `reports/tesis.docx`.** All Category A and B corrections are applied
+**The thesis ground truth is `reports/Trabajo Final John Montoya.docx`.** All Category A and B corrections are applied
 to this `.docx` file. Always confirm with the user before modifying it. The annotated PDF in
 `reports/pdfs/` is reference material from the jury — do not edit.
 
