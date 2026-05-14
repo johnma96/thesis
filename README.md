@@ -12,6 +12,7 @@
 | 1.0.0 | 2026-01-22 | Thesis submission |
 | 1.1.0 | 2026-05-12 | Post-jury corrections applied |
 | 1.2.0 | 2026-05-14 | Repository reorganisation (uv, modular package, FastAPI stub) |
+| 1.3.0 | 2026-05-14 | Performance: vectorised CNN-2D inference, scaler refit, DVC pipeline, GCP proposal |
 
 ---
 

@@ -334,7 +334,6 @@ def train_cnn2d(
     from spectralcrop.config.paths import (
         BANDS_SELECTED,
         LABELS_TIF,
-        MODELS_DIR,
         SPLIT_BINARY_TIF,
         ZARR_CUBE,
     )
@@ -366,10 +365,27 @@ def train_cnn2d(
     with rasterio.open(str(SPLIT_BINARY_TIF)) as src:
         split_map = src.read(1)
 
+    from sklearn.preprocessing import RobustScaler
+
     X_cube = features.values
     H, W, B = X_cube.shape
-    scaler = joblib.load(MODELS_DIR / "robust_scaler.pkl")
-    cube_scaled = scaler.transform(X_cube.reshape(-1, B)).reshape(H, W, B)
+
+    # Extract flat training pixels to fit a fresh scaler on this dataset.
+    # Re-using the original robust_scaler.pkl would be incorrect if the
+    # input image has different radiometric characteristics.
+    X_flat = X_cube.reshape(-1, B)
+    labels_flat = labels_bin.reshape(-1)
+    split_flat = split_map.reshape(-1).astype(float)
+    train_mask = (split_flat == 1) & ~np.isnan(labels_flat) & ~np.isnan(X_flat).any(axis=1)
+    X_train_flat = X_flat[train_mask]
+
+    logger.info("Fitting RobustScaler on %d training pixels...", len(X_train_flat))
+    scaler = RobustScaler().fit(X_train_flat)
+    scaler_path = output_dir / "robust_scaler.pkl"
+    joblib.dump(scaler, scaler_path)
+    logger.info("Scaler saved: %s", scaler_path)
+
+    cube_scaled = scaler.transform(X_flat).reshape(H, W, B)
     logger.info("Cube: %d × %d × %d  |  building patches...", H, W, B)
 
     X_train2d, y_train2d = build_patch_dataset(
@@ -418,10 +434,16 @@ def train_cnn2d(
     info_path = output_dir / "cnn2d_retrain_info.json"
     torch.save(model.state_dict(), weights_path)
     with open(info_path, "w") as f:
-        json.dump({**hparams, "best_val_prauc": best_vl}, f, indent=2)
+        json.dump(
+            {**hparams, "best_val_prauc": best_vl, "scaler": str(scaler_path)},
+            f,
+            indent=2,
+        )
 
     typer.secho(
-        f"✅  Model saved -> {weights_path}  (val PR-AUC={best_vl:.4f})", fg=typer.colors.GREEN
+        f"✅  Model saved -> {weights_path}  (val PR-AUC={best_vl:.4f})\n"
+        f"   Scaler saved -> {scaler_path}",
+        fg=typer.colors.GREEN,
     )
 
 
@@ -442,9 +464,17 @@ def evaluate(
             help="Path to .pt weights. Defaults to models/cnn2d_final_model_weights.pt.",
         ),
     ] = None,
+    output_metrics: Annotated[
+        Path,
+        typer.Option(
+            "--output-metrics",
+            help="JSON file where metrics are written for DVC tracking.",
+        ),
+    ] = Path("reports/metrics_retrain.json"),
 ) -> None:
-    """Evaluate the CNN-2D model on a dataset split and print metrics.
+    """Evaluate the CNN-2D model on a dataset split, print metrics, and write JSON.
 
+    The JSON output is compatible with `dvc metrics diff` for comparing runs.
     Uses the locked decision threshold (0.3218) from the thesis.
     Expected test PR-AUC with the final model: 0.9635.
     """
@@ -513,6 +543,15 @@ def evaluate(
     for k, v in metrics.items():
         typer.echo(f"  {k:<14} {v:.4f}")
     typer.echo()
+
+    # Write metrics JSON for DVC tracking (dvc metrics diff, dvc repro)
+    import json as _json
+
+    output_metrics = Path(output_metrics)
+    output_metrics.parent.mkdir(parents=True, exist_ok=True)
+    payload = {split: {k: round(v, 4) for k, v in metrics.items()}}
+    output_metrics.write_text(_json.dumps(payload, indent=2), encoding="utf-8")
+    typer.secho(f"Metrics written: {output_metrics}", fg=typer.colors.BRIGHT_BLACK)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,22 @@
+# spectralcrop — DVC pipeline parameters
+# Edit this file to change pipeline configuration.
+# Run `dvc repro` after changes to re-execute affected stages.
+
+preprocess:
+  envi_hdr: data/raw/rionegro01_mosaic_geom_atm.hdr
+  output_zarr: data/interim/masked_reflectance.zarr
+  ndvi_threshold: 0.3
+
+labels:
+  gpkg: data/raw/labels_export.gpkg
+  output_tif: data/interim/labels_multiclass.tif
+
+split:
+  output_tif: data/processed/splits/by_plot_split_id_binary.tif
+  train_frac: 0.60
+  val_frac: 0.20
+  seed: 42
+
+train:
+  output_dir: models
+  mlflow_run_name: cnn2d_retrain
