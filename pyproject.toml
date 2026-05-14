@@ -103,6 +103,13 @@ packages = ["spectralcrop"]
 # uv — dependency resolver configuration
 # ---------------------------------------------------------------------------
 [tool.uv]
+# Ensure the lockfile includes wheels for all target platforms,
+# not only the machine where `uv lock` was run (Windows in this project).
+required-environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",  # CI (ubuntu-latest)
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",   # PC A / PC B (Windows)
+]
+
 # pytorch-cpu and pytorch-cu126 are mutually exclusive.
 # Declaring the conflict lets uv resolve each variant independently
 # instead of trying to satisfy both simultaneously (which would fail

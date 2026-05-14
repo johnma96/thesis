@@ -2,9 +2,21 @@ version = 1
 revision = 3
 requires-python = "==3.12.*"
 resolution-markers = [
-    "sys_platform == 'darwin'",
-    "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "sys_platform == 'darwin' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126'",
+    "platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126'",
+    "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')",
+    "sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126'",
+    "platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126'",
+    "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine != 'AMD64' and sys_platform == 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126')",
+    "platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126'",
+    "platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126'",
+    "sys_platform == 'darwin' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126'",
+    "platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126'",
+    "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu' and extra != 'extra-12-spectralcrop-pytorch-cu126')",
+]
+required-markers = [
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
 ]
 conflicts = [[
     { package = "spectralcrop", extra = "pytorch-cpu" },
@@ -1872,7 +1884,7 @@ dependencies = [
     { name = "nbformat" },
     { name = "packaging" },
     { name = "prometheus-client" },
-    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (os_name == 'nt' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
     { name = "pyzmq" },
     { name = "send2trash" },
     { name = "terminado" },
@@ -1890,7 +1902,7 @@ name = "jupyter-server-terminals"
 version = "0.5.4"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (os_name == 'nt' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
     { name = "terminado" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/f4/a7/bcd0a9b0cbba88986fe944aaaf91bfda603e5a50bda8ed15123f381a3b2f/jupyter_server_terminals-0.5.4.tar.gz", hash = "sha256:bbda128ed41d0be9020349f9f1f2a4ab9952a73ed5f5ac9f1419794761fb87f5", size = 31770, upload-time = "2026-01-14T16:53:20.213Z" }
@@ -2882,7 +2894,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "platform_machine != 'AMD64' or sys_platform != 'win32' or extra != 'extra-12-spectralcrop-pytorch-cpu' or (extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450, upload-time = "2023-11-25T09:07:26.339Z" }
 wheels = [
@@ -3860,7 +3872,8 @@ pytorch-cpu = [
     { name = "torch", version = "2.9.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
     { name = "torch", version = "2.9.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(sys_platform != 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
     { name = "torchvision", version = "0.24.1", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (platform_machine != 'aarch64' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (sys_platform != 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
-    { name = "torchvision", version = "0.24.1+d801a34", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
+    { name = "torchvision", version = "0.24.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
+    { name = "torchvision", version = "0.24.1+d801a34", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (platform_machine != 'AMD64' and sys_platform == 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'win32' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
 ]
 pytorch-cu126 = [
     { name = "torch", version = "2.9.1+cu126", source = { registry = "https://download.pytorch.org/whl/cu126" } },
@@ -4030,7 +4043,7 @@ version = "0.18.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "ptyprocess", marker = "os_name != 'nt' or (extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
-    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (os_name == 'nt' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-12-spectralcrop-pytorch-cpu') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126') or (sys_platform == 'darwin' and extra == 'extra-12-spectralcrop-pytorch-cpu' and extra == 'extra-12-spectralcrop-pytorch-cu126')" },
     { name = "tornado" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/8a/11/965c6fd8e5cc254f1fe142d547387da17a8ebfd75a3455f637c663fb38a0/terminado-0.18.1.tar.gz", hash = "sha256:de09f2c4b85de4765f7714688fff57d3e75bad1f909b589fde880460c753fd2e", size = 32701, upload-time = "2024-03-12T14:34:39.026Z" }
@@ -4103,7 +4116,9 @@ version = "2.9.1+cpu"
 source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
     "platform_machine == 'aarch64' and sys_platform == 'linux'",
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32')",
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
 ]
 dependencies = [
     { name = "filelock", marker = "sys_platform != 'darwin'" },
@@ -4198,6 +4213,24 @@ wheels = [
 
 [[package]]
 name = "torchvision"
+version = "0.24.1+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+resolution-markers = [
+    "platform_machine == 'AMD64' and sys_platform == 'win32'",
+    "platform_machine == 'x86_64' and sys_platform == 'linux'",
+]
+dependencies = [
+    { name = "numpy", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+    { name = "pillow", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+    { name = "torch", version = "2.9.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32')" },
+]
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.24.1%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:48ff40694812292f1f75cddb517f9eef224a2e8388798a0aa191e27bf159fc5d", upload-time = "2025-11-15T18:12:45Z" },
+    { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.24.1%2Bcpu-cp312-cp312-win_amd64.whl", hash = "sha256:af904a34b563c302fa4583a4746f3108bafdc5823a67c912d6023a8fe9b01c51", upload-time = "2025-11-15T18:12:45Z" },
+]
+
+[[package]]
+name = "torchvision"
 version = "0.24.1+cu126"
 source = { registry = "https://download.pytorch.org/whl/cu126" }
 resolution-markers = [
@@ -4219,12 +4252,12 @@ name = "torchvision"
 version = "0.24.1+d801a34"
 source = { registry = "https://download.pytorch.org/whl/cpu" }
 resolution-markers = [
-    "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')",
+    "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32')",
 ]
 dependencies = [
-    { name = "numpy", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
-    { name = "pillow", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
-    { name = "torch", version = "2.9.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')" },
+    { name = "numpy", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32')" },
+    { name = "pillow", marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32')" },
+    { name = "torch", version = "2.9.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine != 'aarch64' and platform_machine != 'x86_64' and sys_platform == 'linux') or (platform_machine != 'AMD64' and sys_platform == 'win32') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://download-r2.pytorch.org/whl/cpu/torchvision-0.24.1%2Bd801a34-cp312-cp312-win_arm64.whl", hash = "sha256:f5568bb4dc4069a1e1b1b56bf797db35a37a582e08d227c59f765193f336735c", upload-time = "2025-11-15T18:12:45Z" },
