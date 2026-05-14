@@ -217,5 +217,5 @@ See `docs/thesis_corrections/` for the original jury PDF.
 Data Scientist · MSc. Universidad Nacional de Colombia
 
 🌐 [johnmontoya.vercel.app](https://johnmontoya.vercel.app/) — portfolio  
-📧 jmmontoyaz@unal.edu.co  
+📧 jmmontoyaz@unal.edu.co · jmmontoyaz13@gmail.com  
 🐙 [github.com/johnma96](https://github.com/johnma96)

@@ -106,10 +106,15 @@ models/*.joblib
 # .docx files are NOT tracked — only read-only PDFs are shared via git
 reports/*.docx
 !reports/figures/arquitectura_cnn2d.png
+!reports/figures/arquitectura_cnn1d.png
+# Keep only the final submitted thesis and the annotated jury copy
 !reports/Trabajo\ Final\ John\ Montoya.pdf
 !reports/Trabajo\ Final\ John\ Montoya\ -\ Observaciones\ jurado.pdf
-!reports/Carta\ Respuesta\ -\ Observaciones\ jurado.pdf
-!docs/thesis_corrections/*.pdf
+# The following contain personal data (signatures / cedulas) — never tracked
+# reports/Carta Respuesta - Observaciones jurado.pdf
+# reports/Propuesta Trabajo Final.pdf
+# docs/thesis_corrections/Observaciones TFM John Montoya (23-02-2026) - Manuel Goez.pdf
+# archive/legacy_dependencies/Trabajo Final John Montoya - Feb23-pre-jury.docx
 !references/theses/*.pdf
 !references/papers/*.pdf
 
@@ -125,6 +130,7 @@ reports/*.docx
 *.xlsx
 *.xlsb
 *.xls
+!docs/metrics.xlsx
 *.gsheet
 
 # ── Django / Flask leftovers (template residue) ──────────────
