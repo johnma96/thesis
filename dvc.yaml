@@ -106,6 +106,7 @@ stages:
       uv run python main.py evaluate
       --split test
       --weights ${train.output_dir}/cnn2d_retrain_weights.pt
+      --output-metrics reports/metrics_retrain.json
     deps:
       - ${preprocess.output_zarr}
       - ${labels.output_tif}
