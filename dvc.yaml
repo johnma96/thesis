@@ -1,0 +1,118 @@
+# spectralcrop — DVC declarative pipeline
+#
+# Each stage declares its dependencies (deps) and outputs (outs).
+# DVC re-runs only the stages whose deps have changed, making the
+# pipeline reproducible and incremental.
+#
+# Usage:
+#   dvc repro                     # run all outdated stages
+#   dvc repro train               # run from train onwards
+#   dvc dag                       # visualise the dependency graph
+#   dvc params diff               # compare params to last run
+
+vars:
+  - params.yaml   # hyperparameters and paths read from this file
+
+stages:
+
+  # ── 1. Preprocessing ──────────────────────────────────────────────────────
+  preprocess:
+    desc: "Convert raw ENVI hypercube to masked Zarr + 5 vegetation indices"
+    cmd: >-
+      uv run python main.py preprocess
+      --envi ${preprocess.envi_hdr}
+      --ndvi-threshold ${preprocess.ndvi_threshold}
+    deps:
+      - ${preprocess.envi_hdr}
+      - spectralcrop/data/preprocessing.py
+      - spectralcrop/data/hypercube_processor.py
+    outs:
+      - ${preprocess.output_zarr}:
+          cache: true
+          persist: true
+    params:
+      - preprocess.ndvi_threshold
+
+  # ── 2. Rasterise labels ───────────────────────────────────────────────────
+  make_labels:
+    desc: "Rasterise GeoPackage parcel polygons to labels_multiclass.tif"
+    cmd: >-
+      uv run python main.py make-labels
+      --gpkg ${labels.gpkg}
+      --zarr-ref ${preprocess.output_zarr}
+    deps:
+      - ${labels.gpkg}
+      - ${preprocess.output_zarr}
+      - spectralcrop/data/labeling.py
+    outs:
+      - ${labels.output_tif}:
+          cache: true
+
+  # ── 3. Spatial split ──────────────────────────────────────────────────────
+  make_split:
+    desc: "Stratified spatial train/val/test split by parcel"
+    cmd: >-
+      uv run python main.py make-split
+      --gpkg ${labels.gpkg}
+      --ref-tif ${labels.output_tif}
+      --train ${split.train_frac}
+      --val   ${split.val_frac}
+      --seed  ${split.seed}
+    deps:
+      - ${labels.gpkg}
+      - ${labels.output_tif}
+      - spectralcrop/data/split.py
+    outs:
+      - ${split.output_tif}:
+          cache: true
+    params:
+      - split.train_frac
+      - split.val_frac
+      - split.seed
+
+  # ── 4. Train CNN-2D ───────────────────────────────────────────────────────
+  train:
+    desc: "Train CNN-2D with locked hyperparameters (refit scaler on training split)"
+    cmd: >-
+      uv run python main.py train-cnn2d
+      --use-locked-hparams
+      --run-name ${train.mlflow_run_name}
+      --output-dir ${train.output_dir}
+    deps:
+      - ${preprocess.output_zarr}
+      - ${labels.output_tif}
+      - ${split.output_tif}
+      - spectralcrop/models/dl/train.py
+      - spectralcrop/models/dl/architectures.py
+      - spectralcrop/features/patches.py
+      - spectralcrop/config/constants.py
+    outs:
+      - ${train.output_dir}/cnn2d_retrain_weights.pt:
+          cache: true
+          persist: true
+      - ${train.output_dir}/cnn2d_retrain_info.json:
+          cache: false
+      - ${train.output_dir}/robust_scaler.pkl:
+          cache: true
+          persist: true
+    params:
+      - train.mlflow_run_name
+      - train.output_dir
+
+  # ── 5. Evaluate ───────────────────────────────────────────────────────────
+  evaluate:
+    desc: "Evaluate the retrained CNN-2D on the test split"
+    cmd: >-
+      uv run python main.py evaluate
+      --split test
+      --weights ${train.output_dir}/cnn2d_retrain_weights.pt
+    deps:
+      - ${preprocess.output_zarr}
+      - ${labels.output_tif}
+      - ${split.output_tif}
+      - ${train.output_dir}/cnn2d_retrain_weights.pt
+      - ${train.output_dir}/robust_scaler.pkl
+      - spectralcrop/evaluation/metrics.py
+    metrics:
+      - reports/metrics_retrain.json:
+          cache: false
