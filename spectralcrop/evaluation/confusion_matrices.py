@@ -12,12 +12,13 @@ describe_evaluable_pixels_2d
 
 from __future__ import annotations
 
-import numpy as np
-import pandas as pd
+from pathlib import Path
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
-from pathlib import Path
 from sklearn.metrics import confusion_matrix
 
 
@@ -44,9 +45,9 @@ def compute_normalized_confusion_matrices(
     """
     cm = confusion_matrix(y_true, y_pred)
     return {
-        "abs":   cm,
-        "row":   cm.astype(float) / cm.sum(axis=1, keepdims=True) * 100,
-        "col":   cm.astype(float) / cm.sum(axis=0, keepdims=True) * 100,
+        "abs": cm,
+        "row": cm.astype(float) / cm.sum(axis=1, keepdims=True) * 100,
+        "col": cm.astype(float) / cm.sum(axis=0, keepdims=True) * 100,
         "total": cm.astype(float) / cm.sum() * 100,
     }
 
@@ -91,7 +92,7 @@ def plot_confusion_matrix_grid(
     if len(model_names) != 6:
         raise ValueError(f"Expected exactly 6 models, got {len(model_names)}.")
 
-    model_grid = [model_names[i:i+2] for i in range(0, 6, 2)]
+    model_grid = [model_names[i : i + 2] for i in range(0, 6, 2)]
 
     fig, axes = plt.subplots(3, 2, figsize=figsize, constrained_layout=True)
 
@@ -106,15 +107,21 @@ def plot_confusion_matrix_grid(
                 for c in range(2):
                     annot[r, c] = f"{cm_pct[r, c]:.2f}%\n({cm_abs[r, c]:,})"
 
-            show_x = (row_idx == 2)
-            show_y = (col_idx == 0)
+            show_x = row_idx == 2
+            show_y = col_idx == 0
 
             sns.heatmap(
-                cm_pct, ax=ax, annot=annot, fmt="", cmap="Blues",
-                vmin=0, vmax=100,
+                cm_pct,
+                ax=ax,
+                annot=annot,
+                fmt="",
+                cmap="Blues",
+                vmin=0,
+                vmax=100,
                 xticklabels=class_labels if show_x else False,
                 yticklabels=class_labels if show_y else False,
-                linewidths=0.5, linecolor="gray",
+                linewidths=0.5,
+                linecolor="gray",
                 cbar=False,
                 annot_kws={"size": 9},
             )
@@ -129,22 +136,21 @@ def plot_confusion_matrix_grid(
                 ax.set_xticklabels(ax.get_xticklabels(), rotation=15, ha="right", fontsize=8)
 
     norm = mpl.colors.Normalize(vmin=0, vmax=100)
-    sm   = mpl.cm.ScalarMappable(cmap="Blues", norm=norm)
+    sm = mpl.cm.ScalarMappable(cmap="Blues", norm=norm)
     sm.set_array([])
-    cbar = fig.colorbar(sm, ax=axes[:, 1], orientation="vertical",
-                        shrink=0.9, pad=0.03, aspect=30)
+    cbar = fig.colorbar(sm, ax=axes[:, 1], orientation="vertical", shrink=0.9, pad=0.03, aspect=30)
     cbar.set_label("% (normalizado por fila)", fontsize=9)
     cbar.ax.tick_params(labelsize=8)
 
     fig.suptitle(
         "Matrices de confusión normalizadas por fila (recall por clase) — conjunto de prueba\n"
         "Cada fila suma 100 %. Entre paréntesis: conteo absoluto.",
-        fontsize=11, fontweight="bold",
+        fontsize=11,
+        fontweight="bold",
     )
 
     for ext in ("png", "pdf"):
-        fig.savefig(output_path / f"confusion_matrices_pct.{ext}", dpi=dpi,
-                    bbox_inches="tight")
+        fig.savefig(output_path / f"confusion_matrices_pct.{ext}", dpi=dpi, bbox_inches="tight")
     plt.close()
 
 
@@ -172,26 +178,28 @@ def describe_evaluable_pixels_2d(
     """
     pct = n_2d / n_ml * 100
     r = patch_size // 2
-    return pd.DataFrame([
-        {
-            "Arquitectura": "ML (LR / SGD / LightGBM / XGBoost)",
-            "Pixeles evaluados": n_ml,
-            "Pct vs ML": "100.00%",
-            "Razon": "Vector plano — todos los píxeles válidos del split de prueba",
-        },
-        {
-            "Arquitectura": "CNN-1D",
-            "Pixeles evaluados": n_ml,
-            "Pct vs ML": "100.00%",
-            "Razon": "Vector plano — todos los píxeles válidos del split de prueba",
-        },
-        {
-            "Arquitectura": "CNN-2D",
-            "Pixeles evaluados": n_2d,
-            "Pct vs ML": f"{pct:.2f}%",
-            "Razon": (
-                f"Parches {patch_size}×{patch_size}: excluye ~{r} px del borde de "
-                "cada parcela y píxeles con NaN en la vecindad"
-            ),
-        },
-    ])
+    return pd.DataFrame(
+        [
+            {
+                "Arquitectura": "ML (LR / SGD / LightGBM / XGBoost)",
+                "Pixeles evaluados": n_ml,
+                "Pct vs ML": "100.00%",
+                "Razon": "Vector plano — todos los píxeles válidos del split de prueba",
+            },
+            {
+                "Arquitectura": "CNN-1D",
+                "Pixeles evaluados": n_ml,
+                "Pct vs ML": "100.00%",
+                "Razon": "Vector plano — todos los píxeles válidos del split de prueba",
+            },
+            {
+                "Arquitectura": "CNN-2D",
+                "Pixeles evaluados": n_2d,
+                "Pct vs ML": f"{pct:.2f}%",
+                "Razon": (
+                    f"Parches {patch_size}×{patch_size}: excluye ~{r} px del borde de "
+                    "cada parcela y píxeles con NaN en la vecindad"
+                ),
+            },
+        ]
+    )
