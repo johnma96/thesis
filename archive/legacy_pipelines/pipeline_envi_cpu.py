@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Pipeline ENVI (CPU) para imagen hiperespectral con exportación COG y reporte HTML.
 
@@ -17,20 +16,22 @@ Requisitos: python>=3.8, numpy, rasterio, matplotlib, scikit-learn, pandas (para
 
 import argparse
 import logging
+import re
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
 
-import numpy as np
-import rasterio
-from rasterio.windows import Window
-from rasterio.enums import Resampling
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
+import numpy as np
 import pandas as pd
+import rasterio
+from rasterio.enums import Resampling
+from rasterio.windows import Window
+from sklearn.decomposition import PCA
 
 # ------------------------- Utilidades -------------------------
+
 
 def setup_logger(log_path: Path):
     logging.basicConfig(
@@ -43,15 +44,17 @@ def setup_logger(log_path: Path):
     )
 
 
-def parse_envi_hdr(hdr_path: Path) -> Dict:
+def parse_envi_hdr(hdr_path: Path) -> dict:
     """Parsea un archivo ENVI .hdr a un diccionario, manejando listas y números."""
     meta = {}
     txt = Path(hdr_path).read_text(encoding='utf-8', errors='ignore')
+
     def clean(v: str):
         v = v.strip()
         if v.startswith('{') and v.endswith('}'):
             v = v[1:-1]
         return v.strip()
+
     for line in txt.splitlines():
         if '=' not in line:
             continue
@@ -65,23 +68,19 @@ def parse_envi_hdr(hdr_path: Path) -> Dict:
             meta[key] = val
     # bloques multilínea
     if 'wavelength' in meta and isinstance(meta['wavelength'], str):
-        import re
         m = re.search(r'wavelength\s*=\s*\{([^}]*)\}', txt, re.IGNORECASE | re.DOTALL)
         if m:
-            arr = [a.strip() for a in m.group(1).replace('
-', ' ').split(',') if a.strip()]
+            arr = [a.strip() for a in m.group(1).replace("\n", ' ').split(',') if a.strip()]
             meta['wavelength'] = arr
     if 'fwhm' in meta and isinstance(meta['fwhm'], str):
-        import re
         m = re.search(r'fwhm\s*=\s*\{([^}]*)\}', txt, re.IGNORECASE | re.DOTALL)
         if m:
-            arr = [a.strip() for a in m.group(1).replace('
-', ' ').split(',') if a.strip()]
+            arr = [a.strip() for a in m.group(1).replace("\n", ' ').split(',') if a.strip()]
             meta['fwhm'] = arr
     return meta
 
 
-def get_wavelengths(meta: Dict) -> Optional[np.ndarray]:
+def get_wavelengths(meta: dict) -> np.ndarray | None:
     w = meta.get('wavelength', None)
     if w is None:
         return None
@@ -91,7 +90,7 @@ def get_wavelengths(meta: Dict) -> Optional[np.ndarray]:
         return None
 
 
-def get_fwhm(meta: Dict) -> Optional[np.ndarray]:
+def get_fwhm(meta: dict) -> np.ndarray | None:
     f = meta.get('fwhm', None)
     if f is None:
         return None
@@ -107,18 +106,22 @@ def nearest_band(wavelengths: np.ndarray, target_nm: float) -> int:
 
 # ------------------------- Procesamiento -------------------------
 
-def compute_indices(ds: rasterio.io.DatasetReader,
-                     wavelengths: Optional[np.ndarray],
-                     scale: float,
-                     ignore_values: List[float],
-                     out_dir: Path,
-                     block: int = 1024) -> Dict[str, Path]:
+
+def compute_indices(
+    ds: rasterio.io.DatasetReader,
+    wavelengths: np.ndarray | None,
+    scale: float,
+    ignore_values: list[float],
+    out_dir: Path,
+    block: int = 1024,
+) -> dict[str, Path]:
     """Computa NDVI, NDRE, PRI, PSRI, CIgreen y los guarda como GeoTIFF."""
-    def band_to_refl(bi: int, window: Optional[Window] = None):
+
+    def band_to_refl(bi: int, window: Window | None = None):
         arr = ds.read(bi + 1, window=window).astype(np.float32)
         mask = np.zeros_like(arr, dtype=bool)
         for v in ignore_values:
-            mask |= (arr == v)
+            mask |= arr == v
         arr = arr / scale
         arr[(arr < 0) | (arr > 1.2) | mask] = np.nan
         return arr
@@ -137,7 +140,10 @@ def compute_indices(ds: rasterio.io.DatasetReader,
     b750  = nearest_band(wavelengths, 750)
     b554  = nearest_band(wavelengths, 554)
 
-    logging.info(f"Bandas seleccionadas -> RED:{b_red} NIR:{b_nir} RE:{b_re} 531:{b531} 570:{b570} 678:{b678} 500:{b500} 750:{b750} 554:{b554}")
+    logging.info(
+        f"Bandas seleccionadas -> RED:{b_red} NIR:{b_nir} RE:{b_re} "
+        f"531:{b531} 570:{b570} 678:{b678} 500:{b500} 750:{b750} 554:{b554}"
+    )
 
     h, w = ds.height, ds.width
     profile = {
@@ -165,12 +171,12 @@ def compute_indices(ds: rasterio.io.DatasetReader,
             RED = band_to_refl(b_red, win)
             NIR = band_to_refl(b_nir, win)
             RE  = band_to_refl(b_re,  win)
-            B531= band_to_refl(b531, win)
-            B570= band_to_refl(b570, win)
-            B678= band_to_refl(b678, win)
-            B500= band_to_refl(b500, win)
-            B750= band_to_refl(b750, win)
-            B554= band_to_refl(b554, win)
+            B531 = band_to_refl(b531, win)
+            B570 = band_to_refl(b570, win)
+            B678 = band_to_refl(b678, win)
+            B500 = band_to_refl(b500, win)
+            B750 = band_to_refl(b750, win)
+            B554 = band_to_refl(b554, win)
 
             NDVI = (NIR - RED) / (NIR + RED + 1e-6)
             NDRE = (NIR - RE)  / (NIR + RE  + 1e-6)
@@ -200,7 +206,7 @@ def compute_veg_mask(ndvi_path: Path, threshold: float = 0.3) -> Path:
         profile = src.profile.copy()
         profile.update({'dtype': 'uint8'})
         with rasterio.open(out, 'w', **profile) as dst:
-            for ji, window in src.block_windows(1):
+            for _ji, window in src.block_windows(1):
                 nd = src.read(1, window=window)
                 mask = (nd > threshold) & (nd != -9999)
                 dst.write(mask.astype('uint8'), 1, window=window)
@@ -208,14 +214,16 @@ def compute_veg_mask(ndvi_path: Path, threshold: float = 0.3) -> Path:
     return out
 
 
-def quicklook_rgb(ds: rasterio.io.DatasetReader,
-                   wavelengths: Optional[np.ndarray],
-                   default_bands: Optional[List[int]],
-                   scale: float,
-                   ignore_values: List[float],
-                   out_path: Path) -> Path:
+def quicklook_rgb(
+    ds: rasterio.io.DatasetReader,
+    wavelengths: np.ndarray | None,
+    default_bands: list[int] | None,
+    scale: float,
+    ignore_values: list[float],
+    out_path: Path,
+) -> Path:
     if default_bands:
-        indices = [max(0, int(b)-1) for b in default_bands]
+        indices = [max(0, int(b) - 1) for b in default_bands]
     elif wavelengths is not None:
         r = nearest_band(wavelengths, 650)
         g = nearest_band(wavelengths, 560)
@@ -229,7 +237,7 @@ def quicklook_rgb(ds: rasterio.io.DatasetReader,
         arr = ds.read(bi + 1).astype(np.float32)
         m = np.zeros_like(arr, dtype=bool)
         for v in ignore_values:
-            m |= (arr == v)
+            m |= arr == v
         arr = arr / scale
         arr[(arr < 0) | (arr > 1.2) | m] = np.nan
         return arr
@@ -253,14 +261,16 @@ def quicklook_rgb(ds: rasterio.io.DatasetReader,
     return out_path
 
 
-def pca_quicklook(ds: rasterio.io.DatasetReader,
-                   wavelengths: Optional[np.ndarray],
-                   scale: float,
-                   ignore_values: List[float],
-                   out_path: Path,
-                   sample_rows: int = 300,
-                   block: int = 256,
-                   exclude_water: bool = True) -> Path:
+def pca_quicklook(
+    ds: rasterio.io.DatasetReader,
+    wavelengths: np.ndarray | None,
+    scale: float,
+    ignore_values: list[float],
+    out_path: Path,
+    sample_rows: int = 300,
+    block: int = 256,
+    exclude_water: bool = True,
+) -> Path:
     h, w, B = ds.height, ds.width, ds.count
     valid_bands = np.arange(B)
     if wavelengths is not None and exclude_water:
@@ -268,7 +278,7 @@ def pca_quicklook(ds: rasterio.io.DatasetReader,
         valid_bands = np.where(~water)[0]
     logging.info(f"PCA: usando {len(valid_bands)} bandas válidas / {B}")
 
-    rows = np.linspace(0, h-1, min(sample_rows, h), dtype=int)
+    rows = np.linspace(0, h - 1, min(sample_rows, h), dtype=int)
     X = []
     for r in rows:
         row_stack = []
@@ -276,7 +286,7 @@ def pca_quicklook(ds: rasterio.io.DatasetReader,
             arr = ds.read(bi + 1, window=Window(0, r, w, 1)).astype(np.float32)
             m = np.zeros_like(arr, dtype=bool)
             for v in ignore_values:
-                m |= (arr == v)
+                m |= arr == v
             arr = arr / scale
             arr[(arr < 0) | (arr > 1.2) | m] = np.nan
             row_stack.append(arr[0])
@@ -297,7 +307,7 @@ def pca_quicklook(ds: rasterio.io.DatasetReader,
             arr = ds.read(bi + 1, window=Window(0, r0, w, r1 - r0)).astype(np.float32)
             m = np.zeros_like(arr, dtype=bool)
             for v in ignore_values:
-                m |= (arr == v)
+                m |= arr == v
             arr = arr / scale
             arr[(arr < 0) | (arr > 1.2) | m] = np.nan
             block_stack.append(arr)
@@ -326,13 +336,15 @@ def pca_quicklook(ds: rasterio.io.DatasetReader,
     return out_path
 
 
-def export_cog_multiband(ds: rasterio.io.DatasetReader,
-                          wavelengths: Optional[np.ndarray],
-                          scale: float,
-                          ignore_values: List[float],
-                          out_path: Path,
-                          exclude_water: bool = True,
-                          dtype: str = 'float32') -> Tuple[Path, List[int]]:
+def export_cog_multiband(
+    ds: rasterio.io.DatasetReader,
+    wavelengths: np.ndarray | None,
+    scale: float,
+    ignore_values: list[float],
+    out_path: Path,
+    exclude_water: bool = True,
+    dtype: str = 'float32',
+) -> tuple[Path, list[int]]:
     B = ds.count
     valid = np.arange(B)
     if wavelengths is not None and exclude_water:
@@ -355,11 +367,11 @@ def export_cog_multiband(ds: rasterio.io.DatasetReader,
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with rasterio.open(out_path, 'w', **profile) as dst:
         for out_bi, src_bi in enumerate(valid, start=1):
-            for ji, window in ds.block_windows(1):
+            for _ji, window in ds.block_windows(1):
                 arr = ds.read(src_bi + 1, window=window).astype(np.float32)
                 mask = np.zeros_like(arr, dtype=bool)
                 for v in ignore_values:
-                    mask |= (arr == v)
+                    mask |= arr == v
                 arr = arr / scale
                 arr[(arr < 0) | (arr > 1.2) | mask] = np.nan
                 dst.write(np.nan_to_num(arr, nan=-9999).astype(dtype), out_bi, window=window)
@@ -373,23 +385,28 @@ def export_cog_multiband(ds: rasterio.io.DatasetReader,
     return out_path, valid.tolist()
 
 
-def stats_nodata_by_band(ds: rasterio.io.DatasetReader, ignore_values: List[float]) -> List[float]:
+def stats_nodata_by_band(ds: rasterio.io.DatasetReader, ignore_values: list[float]) -> list[float]:
     ratios = []
     for bi in range(ds.count):
         nodata_pixels = 0
         total = 0
-        for ji, window in ds.block_windows(1):
+        for _ji, window in ds.block_windows(1):
             arr = ds.read(bi + 1, window=window)
             mask = np.zeros_like(arr, dtype=bool)
             for v in ignore_values:
-                mask |= (arr == v)
+                mask |= arr == v
             nodata_pixels += int(mask.sum())
             total += arr.size
         ratios.append(nodata_pixels / max(1, total))
     return ratios
 
 
-def write_csv_bandlist(out_csv: Path, exported_indices: List[int], wavelengths: Optional[np.ndarray], fwhm: Optional[np.ndarray]):
+def write_csv_bandlist(
+    out_csv: Path,
+    exported_indices: list[int],
+    wavelengths: np.ndarray | None,
+    fwhm: np.ndarray | None,
+):
     df = pd.DataFrame({'band_index_0based': exported_indices})
     if wavelengths is not None:
         df['wavelength_nm'] = [float(wavelengths[i]) for i in exported_indices]
@@ -398,21 +415,27 @@ def write_csv_bandlist(out_csv: Path, exported_indices: List[int], wavelengths: 
     df.to_csv(out_csv, index=False)
 
 
-def build_html_report(out_path: Path, context: Dict):
+def build_html_report(out_path: Path, context: dict):
     html = ["<html><head><meta charset='utf-8'><title>Reporte hiperespectral</title>",
             "<style>body{font-family:Arial,Helvetica,sans-serif;max-width:980px;margin:auto;padding:20px} img{max-width:100%}</style>",
             "</head><body>"]
     html.append("<h1>Reporte de procesamiento hiperespectral</h1>")
-    html.append(f"<p><b>Archivo:</b> {context.get('input_path','')}</p>")
-    html.append(f"<p><b>Dimensiones:</b> {context.get('dims','')}</p>" + f" <p><b>CRS:</b> {context.get('crs','')}</p>")
+    html.append(f"<p><b>Archivo:</b> {context.get('input_path', '')}</p>")
+    html.append(
+        f"<p><b>Dimensiones:</b> {context.get('dims', '')}</p>"
+        f" <p><b>CRS:</b> {context.get('crs', '')}</p>"
+    )
     if 'nodata_ratio' in context:
         html.append("<h2>NoData por banda</h2>")
-        html.append("<p>Promedio: %.2f%%</p>" % (100*np.mean(context['nodata_ratio'])))
-        plt.figure(figsize=(8,3))
-        plt.plot(np.arange(len(context['nodata_ratio'])), np.array(context['nodata_ratio'])*100)
-        plt.xlabel('Banda (0-based)'); plt.ylabel('% NoData'); plt.tight_layout()
-        plot_path = Path(context['out_dir'])/ 'qc_nodata.png'
-        plt.savefig(plot_path, dpi=150); plt.close()
+        html.append("<p>Promedio: %.2f%%</p>" % (100 * np.mean(context['nodata_ratio'])))
+        plt.figure(figsize=(8, 3))
+        plt.plot(np.arange(len(context['nodata_ratio'])), np.array(context['nodata_ratio']) * 100)
+        plt.xlabel('Banda (0-based)')
+        plt.ylabel('% NoData')
+        plt.tight_layout()
+        plot_path = Path(context['out_dir']) / 'qc_nodata.png'
+        plt.savefig(plot_path, dpi=150)
+        plt.close()
         html.append(f"<img src='{plot_path.name}' alt='NoData por banda'>")
     if 'rgb_path' in context:
         html.append("<h2>Quicklook RGB</h2>")
@@ -432,14 +455,13 @@ def build_html_report(out_path: Path, context: Dict):
             html.append(f"<p>Lista de bandas exportadas: {Path(context['band_list_csv']).name}</p>")
     html.append("<hr><p>Generado automáticamente.</p>")
     html.append("</body></html>")
-    out_path.write_text('
-'.join(html), encoding='utf-8')
+    out_path.write_text("\n".join(html), encoding='utf-8')
 
 
 # ------------------------- Main -------------------------
 
+
 def main():
-    import argparse
     ap = argparse.ArgumentParser(description='Pipeline ENVI (CPU) con COG y reporte HTML')
     ap.add_argument('--hdr', required=True, help='Ruta al archivo .hdr de ENVI')
     ap.add_argument('--outdir', required=True, help='Directorio de salida')
@@ -492,10 +514,15 @@ def main():
                 default_bands = [int(x) for x in meta['default bands']]
             except Exception:
                 default_bands = None
-        rgb_path = quicklook_rgb(ds, wavelengths, default_bands, scale, ignore_values, outdir / 'quicklook_rgb.png')
+        rgb_path = quicklook_rgb(
+            ds, wavelengths, default_bands, scale, ignore_values, outdir / 'quicklook_rgb.png'
+        )
         context['rgb_path'] = str(rgb_path)
 
-        pca_path = pca_quicklook(ds, wavelengths, scale, ignore_values, outdir / 'quicklook_pca.png', exclude_water=args.exclude_water)
+        pca_path = pca_quicklook(
+            ds, wavelengths, scale, ignore_values, outdir / 'quicklook_pca.png',
+            exclude_water=args.exclude_water,
+        )
         context['pca_path'] = str(pca_path)
 
         indices_paths = compute_indices(ds, wavelengths, scale, ignore_values, outdir / 'indices')
@@ -504,7 +531,11 @@ def main():
         veg_path = compute_veg_mask(indices_paths['NDVI'], threshold=args.ndvi_threshold)
         context['veg_mask'] = str(veg_path)
 
-        cog_path, exported = export_cog_multiband(ds, wavelengths, scale, ignore_values, outdir / 'cog' / 'reflectance_valid_bands.tif', exclude_water=args.exclude_water)
+        cog_path, exported = export_cog_multiband(
+            ds, wavelengths, scale, ignore_values,
+            outdir / 'cog' / 'reflectance_valid_bands.tif',
+            exclude_water=args.exclude_water,
+        )
         context['cog_path'] = str(cog_path)
 
     csv_path = outdir / 'cog' / 'reflectance_valid_bands.csv'

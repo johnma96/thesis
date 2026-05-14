@@ -1,0 +1,1 @@
+{"best_thr": 0.44555555555555554, "patch_size": 3, "n_channels": 63, "architecture": "SpectralSpatialCNN2D", "lr": 0.001, "batch_size": 64, "kernel_size": 3, "max_epochs": 80, "patience": 12, "weight_decay": 1e-05, "dropout": 0.3, "seed": 42}

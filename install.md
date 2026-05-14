@@ -1,71 +1,119 @@
-# thesis installation guide
+# Installation guide
 
 ## Prerequisites
 
-- Python >= 3.11.3
+- **Python 3.12** (exactly — `requires-python = ">=3.12,<3.13"`)
+- **[uv](https://docs.astral.sh/uv/)** ≥ 0.4 — recommended package manager:
+  ```bash
+  # macOS / Linux
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # Windows (PowerShell)
+  powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+  ```
+- **git** + **DVC remote credentials** (DagsHub) — see [docs/README_DVC_GoogleDrive.md](docs/README_DVC_GoogleDrive.md)
 
-## Create and activate and environment and install required packages
+---
 
-### 1. Using venv library
-Go to the project directory and run the following command:
+## Quick start with uv
 
-```bash
-python -m venv .venv
-```
-
-To activate the environment use the following command
-
-On Unix or MacOS:
-
-```bash
-source .venv/bin/activate
-```
-
-On Windows:
-
-- With gitbash:
-```bash
-source .venv/Scripts/activate
-```
-- With command promt or anaconda terminal:
-```bash
-.venv\Scripts\activate
-```
-
-#### 1.1 Install required packages
-
-Please read the requirements.txt file (for virtual environments with venv library) where you will find the suggested libraries, you may need to add or remove libraries.
-
-### Using venv
-```bash
-python -m pip install --upgrade pip
-pip config set global.trusted-host "pypi.org files pythonhosted.org pypi.python.org"
-pip install --no-cache-dir -r requirements.txt
-```
-
-In case you require Jupyter and Jupyterlab, run the commands:
+### 1. Clone the repository
 
 ```bash
-pip install jupyter
-pip install jupyterlab
+git clone https://github.com/johnma96/thesis.git
+cd thesis
 ```
 
-The packages necessary to run the project are now installed inside the environment.
+### 2. Install dependencies
 
-### Using conda
+**CPU-only** (CI, machines without GPU):
+```bash
+uv sync --extra pytorch-cpu --extra notebooks
+```
 
-Please read the environment.yml file (for virtual environments with conda) where you will find the suggested libraries, you may need to add or remove libraries; or you could change the name of the environment or modify the channels to download libraries.
+**GPU — CUDA 12.6** (PC B: NVIDIA GeForce RTX 3050):
+```bash
+uv sync --extra pytorch-cu126 --extra notebooks
+```
 
-Note that anaconda virtual environments are not stored in the project root folder but are usually stored in the Anaconda/ path. The environment.yml file contains the name of the virtual environment that will be used for this project, however it is possible that you already have a virtual environment with the necessary libraries, so you would not need to create one again but simply use the other one.
+**Development environment** (adds linting, testing, type-checking):
+```bash
+uv sync --extra pytorch-cu126 --extra notebooks --extra dev
+```
 
-#### Create virtual environment and install required packages 
+**API serving** (FastAPI stubs):
+```bash
+uv sync --extra pytorch-cu126 --extra api
+```
+
+### 3. Pull data and models from DVC
 
 ```bash
-conda env create --file environment.yml
+uv run dvc pull
 ```
 
-#### Activate virtual environment
+> For the full pipeline: `uv run dvc pull data/raw.dvc data/processed.dvc models.dvc`
+
+### 4. Verify installation
 
 ```bash
-conda activate thesis
+uv run python -c "import spectralcrop; import torch; print('OK', torch.__version__)"
+uv run python main.py --help
 ```
+
+---
+
+## Alternative: pip install (no uv required)
+
+Pip-compatible frozen exports are generated from the lockfile:
+
+```bash
+# CPU:
+pip install -r requirements-export-cpu.txt
+# GPU (CUDA 12.6):
+pip install -r requirements-export-cu126.txt
+```
+
+> These files include all transitive dependencies pinned to exact versions
+> for full reproducibility without uv.
+
+---
+
+## Reproducing thesis results
+
+### Retrain final CNN-2D model (locked hyperparameters from MLflow)
+
+```bash
+uv run python main.py train-cnn2d --use-locked-hparams
+```
+
+### Evaluate on test set
+
+```bash
+uv run python main.py evaluate --model cnn2d --split test
+```
+
+### Run full pipeline
+
+```bash
+uv run python main.py full-pipeline
+```
+
+---
+
+## DagsHub credentials (DVC remote)
+
+Credentials are stored in `.dvc/config.local` (gitignored — never committed).
+
+```bash
+dvc remote modify origin --local access_key_id <dagshub_token>
+dvc remote modify origin --local secret_access_key <dagshub_token>
+```
+
+---
+
+## Environment summary
+
+| Machine | GPU | torch extra |
+|---|---|---|
+| PC A | None (CPU) | `pytorch-cpu` |
+| PC B | NVIDIA RTX 3050 | `pytorch-cu126` |

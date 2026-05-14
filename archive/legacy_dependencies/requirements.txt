@@ -1,0 +1,85 @@
+# ============================================================
+# SpectraBean — Dependencias del proyecto
+# Python 3.12.x  |  Entorno: .venv
+# ============================================================
+#
+# Setup rápido:
+#   python -m venv .venv
+#   source .venv/Scripts/activate          # Windows Git Bash
+#   # o: .venv\Scripts\activate            # Windows CMD
+#
+#   pip install --upgrade pip
+#   pip install -r requirements.txt
+#
+# PyTorch (instalar por separado según hardware):
+#   CPU:        pip install -r requirements-pytorch-cpu.txt
+#   CUDA 12.6:  pip install -r requirements-pytorch-cu126.txt
+#
+# ============================================================
+
+# ------------------------------------------------------------
+# Núcleo numérico / datos
+# ------------------------------------------------------------
+numpy==2.3.5
+pandas==2.2.3
+scipy==1.16.2
+
+# ------------------------------------------------------------
+# Geoespacial / hiperespectral
+# ------------------------------------------------------------
+rasterio==1.4.3
+rioxarray==0.20.0
+geopandas==1.1.1
+affine==2.4.0
+spectral==0.24
+opencv-python==4.11.0.86
+
+# ------------------------------------------------------------
+# Arrays multidimensionales / datos estructurados
+# ------------------------------------------------------------
+xarray==2025.12.0
+dask==2025.10.0
+zarr==3.1.5
+numcodecs==0.16.5
+
+# ------------------------------------------------------------
+# Machine Learning
+# ------------------------------------------------------------
+scikit-learn==1.7.2
+imbalanced-learn==0.14.0
+xgboost==3.1.2
+lightgbm==4.6.0
+optuna==4.6.0
+joblib==1.5.3
+
+# Exploración inicial de modelos (notebook 301)
+# Nota: lazypredict puede tener conflictos con scikit-learn >= 1.6
+# Instalar manualmente si se necesita: pip install lazypredict==0.2.12
+# lazypredict==0.2.12
+
+# ------------------------------------------------------------
+# Seguimiento de experimentos / versionado de datos
+# ------------------------------------------------------------
+mlflow==3.8.1
+dagshub==0.6.4
+dvc[s3,gdrive]==3.63.0
+
+# ------------------------------------------------------------
+# Visualización
+# ------------------------------------------------------------
+matplotlib==3.10.1
+seaborn==0.13.2
+
+# ------------------------------------------------------------
+# Utilitarios
+# ------------------------------------------------------------
+pyprojroot==0.3.0
+python-dotenv==1.1.0
+tqdm==4.67.1
+psutil==7.1.3
+
+# ------------------------------------------------------------
+# Jupyter / desarrollo
+# ------------------------------------------------------------
+ipykernel==6.29.5
+ipywidgets==8.1.5

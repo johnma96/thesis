@@ -1,120 +1,689 @@
-# This file serves as an example for configuring a runtime function. 
-# Here is the execution functions of the external behavior model trained in 2024-06
+"""
+spectralcrop — CNN-2D pipeline orchestrator.
 
-import sys
-import pytz
-import pandas as pd
+Complete, reproducible pipeline for phosphorus-deficiency detection in common
+beans using UAV hyperspectral imagery and the CNN-2D architecture.
 
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from spectralcrop.models import Predict
-from spectralcrop.utils import PathManager
+----------------------------------------------------------------------------
+RETRAINING WORKFLOW (new labeled data)
+----------------------------------------------------------------------------
+    uv run python main.py preprocess   --envi path/to/image.hdr
+    uv run python main.py make-labels  --gpkg path/to/labels.gpkg
+    uv run python main.py make-split   --gpkg path/to/labels.gpkg
+    uv run python main.py train-cnn2d  --use-locked-hparams
+    uv run python main.py evaluate     --model cnn2d --split test
 
-#--- Time zone for date handling
-timezone_colombia = pytz.timezone('America/Bogota')
+Or in one shot:
+    uv run python main.py full-pipeline --envi path/to/image.hdr \\
+                                        --gpkg path/to/labels.gpkg
 
-# Setting variables to model and save predictions
-model_name = "lr2_scorecard_cat_no_grp_porc_endeuda_sf_pipe_grid_model"
-translate = [0, 430, 485, 640, 690, 718, 800, 813, 850, 900, 1000]
+----------------------------------------------------------------------------
+PRODUCTION WORKFLOW (new unlabelled image -> prediction map)
+----------------------------------------------------------------------------
+    uv run python main.py predict-pipeline --envi path/to/new_image.hdr
 
-def run_prediction(save_to_impala: bool = True, **kwargs):
+Or step by step:
+    uv run python main.py preprocess --envi path/to/new_image.hdr
+    uv run python main.py predict
+
+----------------------------------------------------------------------------
+All commands require data to be available locally. Run `dvc pull` first
+if you are starting from a clean clone.
+"""
+
+from __future__ import annotations
+
+import logging
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+app = typer.Typer(
+    name="spectralcrop",
+    help=(
+        "Non-invasive P-deficiency detection in common beans — "
+        "full CNN-2D pipeline (preprocess -> train -> evaluate / predict)."
+    ),
+    no_args_is_help=True,
+    rich_markup_mode="rich",
+)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("spectralcrop.main")
+
+# ---------------------------------------------------------------------------
+# Shared defaults
+# ---------------------------------------------------------------------------
+
+
+def _default_paths():
+    from spectralcrop.config.paths import (
+        BANDS_SELECTED,
+        INTERIM_DIR,
+        LABELS_TIF,
+        MODELS_DIR,
+        PROCESSED_DIR,
+        RAW_DIR,
+        SPLIT_BINARY_TIF,
+        ZARR_CUBE,
+    )
+
+    return (
+        ZARR_CUBE,
+        LABELS_TIF,
+        SPLIT_BINARY_TIF,
+        BANDS_SELECTED,
+        MODELS_DIR,
+        PROCESSED_DIR,
+        INTERIM_DIR,
+        RAW_DIR,
+    )
+
+
+def _check_zarr_ready(zarr_path: Path) -> None:
+    if not zarr_path.exists():
+        typer.secho(
+            f"Zarr not found: {zarr_path}\n"
+            "Run `uv run python main.py preprocess --envi <path_to_hdr>` first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+
+def _check_labels_ready(labels_tif: Path, split_tif: Path) -> None:
+    missing = [p for p in [labels_tif, split_tif] if not p.exists()]
+    if missing:
+        typer.secho(
+            "Missing label/split files:\n"
+            + "\n".join(f"  {p}" for p in missing)
+            + "\nRun make-labels and make-split first.",
+            fg=typer.colors.RED,
+        )
+        raise typer.Exit(code=1)
+
+
+# ---------------------------------------------------------------------------
+# 1. PREPROCESS
+# ---------------------------------------------------------------------------
+
+
+@app.command("preprocess")
+def preprocess(
+    envi: Annotated[
+        Path,
+        typer.Option("--envi", help="Path to the ENVI .hdr header file."),
+    ],
+    output_zarr: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-zarr",
+            help="Destination zarr path. Defaults to data/interim/masked_reflectance.zarr.",
+        ),
+    ] = None,
+    ndvi_threshold: Annotated[
+        float,
+        typer.Option("--ndvi-threshold", help="NDVI threshold for vegetation mask."),
+    ] = 0.3,
+    resume: Annotated[
+        bool,
+        typer.Option("--resume/--no-resume", help="Resume an interrupted zarr write."),
+    ] = False,
+) -> None:
+    """Process a raw ENVI hypercube -> masked Zarr with reflectance + all 5 VI.
+
+    Steps performed:
+      1. Open the ENVI file with the spectral library.
+      2. Convert raw DN -> physical reflectance [0–1.2], mask nodata.
+      3. Apply vegetation mask (NDVI > threshold).
+      4. Exclude water-absorption bands (~1340–1440 nm, ~1800–1950 nm).
+      5. Export reflectance cube + NDVI + veg_mask to zarr.
+      6. Compute and append NDRE, CIgreen, PRI, PSRI to the zarr.
+
+    The output zarr is the starting point for both the training and
+    production prediction pipelines.
     """
-    Run predictions for customer defaults within the specified date.
+    from spectralcrop.config.paths import ZARR_CUBE
+    from spectralcrop.data.preprocessing import preprocess_envi_to_zarr
 
-    Parameters
-    ----------
-    save_to_impala : bool, optional
-        If True, save prediction results to Impala. Default is True.
-    **kwargs : dict
-        Additional keyword arguments:
-        - start_date : str, optional
-            Start date for prediction processing. If provided, it overrides the default start date.
-        - end_date : str, optional
-            End date for prediction processing. If provided, it overrides the default end date.
+    dest = output_zarr if output_zarr is not None else ZARR_CUBE
+    typer.echo(f"Preprocessing {envi} -> {dest}")
+    preprocess_envi_to_zarr(
+        hdr_path=envi,
+        output_zarr=dest,
+        ndvi_threshold=ndvi_threshold,
+        resume=resume,
+    )
+    typer.secho("✅  Preprocessing complete.", fg=typer.colors.GREEN)
 
-    Raises
-    ------
-    SystemExit
-        If the model has already been executed for the specified date 
-        range (last_date_model_execution matches current_date_str).
 
-    Notes
-    -----
-    This function runs predictions for customer defaults based on the specified 
-    date range. It checks if the model has already been executed for the date 
-    and raises a SystemExit exception if so. Otherwise, it iterates over the dates
-    range and executes predictions for each month within the range, using the 
-    `make_prediction` function.
+# ---------------------------------------------------------------------------
+# 2. MAKE-LABELS
+# ---------------------------------------------------------------------------
 
-    The results of the predictions can be optionally saved to Impala 
-    if `save_to_impala` is True.
+
+@app.command("make-labels")
+def make_labels(
+    gpkg: Annotated[
+        Path | None,
+        typer.Option(
+            "--gpkg",
+            help="GeoPackage with labelled parcel polygons. Defaults to data/raw/labels_export.gpkg.",
+        ),
+    ] = None,
+    output_tif: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-tif", help="Output label TIF. Defaults to data/interim/labels_multiclass.tif."
+        ),
+    ] = None,
+    layer: Annotated[
+        str | None,
+        typer.Option("--layer", help="GeoPackage layer name (if there are multiple layers)."),
+    ] = None,
+    class_col: Annotated[
+        str,
+        typer.Option("--class-col", help="Column with integer class labels (0–3)."),
+    ] = "class",
+    zarr_reference: Annotated[
+        Path | None,
+        typer.Option(
+            "--zarr-ref", help="Zarr from which to read the spatial grid (CRS/transform/shape)."
+        ),
+    ] = None,
+) -> None:
+    """Rasterise GeoPackage parcel polygons -> labels_multiclass.tif.
+
+    Label mapping:  0 = control (100% P)  |  1,2,3 = stressed (25/50/75% P)
+    Nodata value = 255.
+
+    The spatial grid (CRS, pixel size, extent) is taken from the zarr
+    produced by the preprocess step. If no zarr is provided, it defaults
+    to data/interim/masked_reflectance.zarr.
     """
+    from spectralcrop.config.paths import LABELS_TIF, RAW_DIR, ZARR_CUBE
+    from spectralcrop.data.labeling import rasterize_labels
 
-    global model_name, translate
+    gpkg_path = gpkg if gpkg is not None else RAW_DIR / "labels_export.gpkg"
+    out_tif = output_tif if output_tif is not None else LABELS_TIF
+    zarr_ref = zarr_reference if zarr_reference is not None else ZARR_CUBE
 
-    try:
-        start_date = kwargs['start_date']
-    except:
-        #--- Time zone for date handling
-        timezone_colombia = pytz.timezone('America/Bogota')
-        current_date = datetime.now(timezone_colombia) - relativedelta(months=1)
-        start_date = current_date.strftime("%Y-%m")
+    if not gpkg_path.exists():
+        typer.secho(f"GeoPackage not found: {gpkg_path}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
 
-    model_name = kwargs.get('model_name', model_name)
-    end_date = kwargs.get('end_date', start_date)
+    typer.echo(f"Rasterising {gpkg_path} -> {out_tif}")
+    rasterize_labels(
+        gpkg_path=gpkg_path,
+        output_tif=out_tif,
+        reference_zarr=zarr_ref,
+        layer=layer,
+        class_col=class_col,
+    )
+    typer.secho("✅  Labels written.", fg=typer.colors.GREEN)
 
-    dates = pd.date_range(start=start_date, end=end_date, freq='MS')
-    dates = [d.strftime("%Y-%m") for d in dates]
-    predictor_object = Predict(dates=dates)
-    predictions = predictor_object.make_prediction(
-                                        model_name=model_name,
-                                        lims_translate=translate,
-                                        save_predictions=True
-                                        )
 
-    # Control clients
-    sd = start_date.replace('-', '')
-    ed = end_date.replace('-', '')
-    if ed == sd:
-        file_name = 'control_clients_pred_{}.log'.format(sd)
-    else:
-        file_name = 'control_clients_pred_{}_{}.log'.format(sd, ed)
+# ---------------------------------------------------------------------------
+# 3. MAKE-SPLIT
+# ---------------------------------------------------------------------------
 
-    f_path = PathManager().get_abs_path_folder('logs') + file_name
-    control_clients = [32244023, 1048019199, 1048019951, 1037624693, 1037631295, 1037657056]
-    with open(f_path, "w") as f:
-        print(predictions.loc[predictions['id'].isin(control_clients), ['fa', 'id', 'Score', 'T_Externa']].sort_values(by=['id', 'fa']), file=f)
 
-def run_generate_features_to_train():
-    pass
+@app.command("make-split")
+def make_split(
+    gpkg: Annotated[
+        Path | None,
+        typer.Option(
+            "--gpkg",
+            help="GeoPackage with parcel polygons. Defaults to data/raw/labels_export.gpkg.",
+        ),
+    ] = None,
+    output_tif: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-tif",
+            help="Output split TIF. Defaults to data/processed/splits/by_plot_split_id_binary.tif.",
+        ),
+    ] = None,
+    reference_tif: Annotated[
+        Path | None,
+        typer.Option(
+            "--ref-tif",
+            help="Reference raster for CRS/transform/shape. Defaults to labels_multiclass.tif.",
+        ),
+    ] = None,
+    class_col: Annotated[str, typer.Option("--class-col")] = "class",
+    plot_col: Annotated[str, typer.Option("--plot-col")] = "plot",
+    train_frac: Annotated[float, typer.Option("--train")] = 0.60,
+    val_frac: Annotated[float, typer.Option("--val")] = 0.20,
+    seed: Annotated[int, typer.Option("--seed")] = 42,
+) -> None:
+    """Generate a stratified spatial train/val/test split -> split_id GeoTIFF.
 
-def run_train_model():
-    pass
+    Parcels are grouped by (class, plot) and split at the group level so
+    that whole parcels land in a single fold (no pixel-level spatial leakage).
 
-def run_make_backtesting():
-    pass
+    Output values: 1=train  2=val  3=test  0=outside.
+    """
+    from spectralcrop.config.paths import LABELS_TIF, RAW_DIR, SPLIT_BINARY_TIF
+    from spectralcrop.data.split import make_spatial_split
 
-if __name__ == '__main__':
+    gpkg_path = gpkg if gpkg is not None else RAW_DIR / "labels_export.gpkg"
+    out_tif = output_tif if output_tif is not None else SPLIT_BINARY_TIF
+    ref_tif = reference_tif if reference_tif is not None else LABELS_TIF
 
-    # Dictionary to select the process(function) to be executed
+    if not gpkg_path.exists():
+        typer.secho(f"GeoPackage not found: {gpkg_path}", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
 
-    process_to_run = {
-        "prediction": run_prediction,
-        "features_to_train": run_generate_features_to_train,
-        "train_model": run_train_model,
-        "make_backtesting": run_make_backtesting
-    }[sys.argv[1]]
+    typer.echo(f"Creating split raster -> {out_tif}")
+    assign = make_spatial_split(
+        gpkg_path=gpkg_path,
+        output_tif=out_tif,
+        reference_tif=ref_tif if ref_tif.exists() else None,
+        class_col=class_col,
+        plot_col=plot_col,
+        train_frac=train_frac,
+        val_frac=val_frac,
+        seed=seed,
+    )
+    typer.echo(assign.groupby("split").size().to_string())
+    typer.secho("✅  Split raster written.", fg=typer.colors.GREEN)
 
-    try:
-        kwargs = {value.split('=')[0]:value.split('=')[1] for value in sys.argv[2:]}
-    except:
-        raise ValueError('A value that does not specify the parameter to configure has been entered. It should have the form key=value')
-    
-    start_execution = datetime.now(timezone_colombia).strftime('%Y-%m-%d %H:%M:%S')
-    print(f'-------- Process started at {start_execution} Colombian time --------\n')
 
-    process_to_run(**kwargs)
+# ---------------------------------------------------------------------------
+# 4. TRAIN-CNN2D
+# ---------------------------------------------------------------------------
 
-    # python main.py prediction
-    # python main.py prediction start_date=2024-04
-    # python main.py prediction start_date=2024-03 end_date=2024-05
+
+@app.command("train-cnn2d")
+def train_cnn2d(
+    use_locked_hparams: Annotated[
+        bool,
+        typer.Option(
+            "--use-locked-hparams/--custom-hparams",
+            help="Use the hyperparameters locked in constants.py (recommended).",
+        ),
+    ] = True,
+    mlflow_run_name: Annotated[str, typer.Option("--run-name")] = "cnn2d_retrain",
+    output_dir: Annotated[Path, typer.Option("--output-dir")] = Path("models"),
+) -> None:
+    """Train (or retrain) the CNN-2D model on the processed data.
+
+    Prerequisites: preprocess, make-labels, make-split must have been run
+    (or the DVC-tracked artefacts must be present via `dvc pull`).
+
+    When --use-locked-hparams (default), uses the hyperparameters from the
+    thesis MLflow run (run_id 61a3cc05f39d46f79f2e3fa3d29fae7f), guaranteeing
+    a comparable model.  Expected result: val PR-AUC ≈ 0.96.
+    """
+    import json
+
+    import joblib
+    import mlflow
+    import numpy as np
+    import pandas as pd
+    import rasterio
+    import torch
+    import xarray as xr
+
+    from spectralcrop.config.constants import CNN2D_HPARAMS, MLFLOW_TRACKING_URI, RANDOM_SEED
+    from spectralcrop.config.paths import (
+        BANDS_SELECTED,
+        LABELS_TIF,
+        MODELS_DIR,
+        SPLIT_BINARY_TIF,
+        ZARR_CUBE,
+    )
+    from spectralcrop.features.patches import build_patch_dataset
+    from spectralcrop.models.dl.architectures import SpectralSpatialCNN2D
+    from spectralcrop.models.dl.train import fit_cnn2d
+
+    _check_zarr_ready(ZARR_CUBE)
+    _check_labels_ready(LABELS_TIF, SPLIT_BINARY_TIF)
+
+    hparams = CNN2D_HPARAMS
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    logger.info("Device: %s", device)
+
+    logger.info("Loading data...")
+    ds = xr.open_zarr(str(ZARR_CUBE), chunks={"band": 64, "y": 512, "x": 512})
+    bands_df = pd.read_csv(BANDS_SELECTED)
+    selected_bands = bands_df["band_index"].tolist()
+
+    indices_da = ds[["NDVI", "NDRE", "CIgreen", "PRI", "PSRI"]].to_array(dim="band")
+    refl_sel = ds["reflectance"].isel(band=selected_bands)
+    features = xr.concat([indices_da, refl_sel], dim="band").transpose("y", "x", "band")
+
+    with rasterio.open(str(LABELS_TIF)) as src:
+        labels_raw = src.read(1)
+    labels_bin = np.where(labels_raw == 0, 0, np.where(np.isin(labels_raw, [1, 2, 3]), 1, np.nan))
+    with rasterio.open(str(SPLIT_BINARY_TIF)) as src:
+        split_map = src.read(1)
+
+    X_cube = features.values
+    H, W, B = X_cube.shape
+    scaler = joblib.load(MODELS_DIR / "robust_scaler.pkl")
+    cube_scaled = scaler.transform(X_cube.reshape(-1, B)).reshape(H, W, B)
+    logger.info("Cube: %d × %d × %d  |  building patches...", H, W, B)
+
+    X_train2d, y_train2d = build_patch_dataset(
+        cube_scaled, labels_bin, split_map, 1, hparams["patch_size"]
+    )
+    X_val2d, y_val2d = build_patch_dataset(
+        cube_scaled, labels_bin, split_map, 2, hparams["patch_size"]
+    )
+    logger.info("train=%d  val=%d", len(X_train2d), len(X_val2d))
+
+    torch.manual_seed(RANDOM_SEED)
+    model = SpectralSpatialCNN2D(
+        n_channels=hparams["n_channels"],
+        n_classes=2,
+        kernel_size=hparams["kernel_size"],
+        dropout=hparams["dropout"],
+    )
+
+    mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+    with mlflow.start_run(run_name=mlflow_run_name):
+        mlflow.log_params(hparams)
+
+        def _on_epoch(ep: int, tr: float, vl: float) -> None:
+            logger.info("epoch %3d | train_loss=%.4f  val_prauc=%.4f", ep, tr, vl)
+            mlflow.log_metrics({"train_loss": tr, "val_prauc": vl}, step=ep)
+
+        model, _, val_praucs = fit_cnn2d(
+            model=model,
+            X_train=X_train2d,
+            y_train=y_train2d,
+            X_val=X_val2d,
+            y_val=y_val2d,
+            lr=hparams["lr"],
+            batch_size=hparams["batch_size"],
+            max_epochs=hparams["max_epochs"],
+            patience=hparams["patience"],
+            weight_decay=hparams["weight_decay"],
+            device=device,
+            seed=RANDOM_SEED,
+            on_epoch_end=_on_epoch,
+        )
+        best_vl = max(val_praucs)
+        mlflow.log_metric("best_val_prauc", best_vl)
+
+    weights_path = output_dir / "cnn2d_retrain_weights.pt"
+    info_path = output_dir / "cnn2d_retrain_info.json"
+    torch.save(model.state_dict(), weights_path)
+    with open(info_path, "w") as f:
+        json.dump({**hparams, "best_val_prauc": best_vl}, f, indent=2)
+
+    typer.secho(
+        f"✅  Model saved -> {weights_path}  (val PR-AUC={best_vl:.4f})", fg=typer.colors.GREEN
+    )
+
+
+# ---------------------------------------------------------------------------
+# 5. EVALUATE
+# ---------------------------------------------------------------------------
+
+
+@app.command("evaluate")
+def evaluate(
+    split: Annotated[
+        str, typer.Option("--split", help="Dataset split: train | val | test.")
+    ] = "test",
+    weights_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--weights",
+            help="Path to .pt weights. Defaults to models/cnn2d_final_model_weights.pt.",
+        ),
+    ] = None,
+) -> None:
+    """Evaluate the CNN-2D model on a dataset split and print metrics.
+
+    Uses the locked decision threshold (0.3218) from the thesis.
+    Expected test PR-AUC with the final model: 0.9635.
+    """
+    import joblib
+    import numpy as np
+    import pandas as pd
+    import rasterio
+    import torch
+    import xarray as xr
+
+    from spectralcrop.config.paths import (
+        BANDS_SELECTED,
+        LABELS_TIF,
+        MODELS_DIR,
+        SPLIT_BINARY_TIF,
+        ZARR_CUBE,
+    )
+    from spectralcrop.evaluation.metrics import compute_all_metrics
+    from spectralcrop.features.patches import build_patch_dataset
+    from spectralcrop.models.dl.predict import load_cnn2d, predict_proba_2d
+
+    _check_zarr_ready(ZARR_CUBE)
+    _check_labels_ready(LABELS_TIF, SPLIT_BINARY_TIF)
+
+    split_map_val = {"train": 1, "val": 2, "test": 3}
+    if split not in split_map_val:
+        typer.secho(f"Unknown split '{split}'. Use: train, val, test", fg=typer.colors.RED)
+        raise typer.Exit(code=1)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    logger.info("Loading data...")
+    ds = xr.open_zarr(str(ZARR_CUBE), chunks={"band": 64, "y": 512, "x": 512})
+    bands_df = pd.read_csv(BANDS_SELECTED)
+    selected_bands = bands_df["band_index"].tolist()
+
+    indices_da = ds[["NDVI", "NDRE", "CIgreen", "PRI", "PSRI"]].to_array(dim="band")
+    refl_sel = ds["reflectance"].isel(band=selected_bands)
+    features = xr.concat([indices_da, refl_sel], dim="band").transpose("y", "x", "band")
+
+    with rasterio.open(str(LABELS_TIF)) as src:
+        labels_raw = src.read(1)
+    labels_bin = np.where(labels_raw == 0, 0, np.where(np.isin(labels_raw, [1, 2, 3]), 1, np.nan))
+    with rasterio.open(str(SPLIT_BINARY_TIF)) as src:
+        split_arr = src.read(1)
+
+    X_cube = features.values
+    H, W, B = X_cube.shape
+    scaler = joblib.load(MODELS_DIR / "robust_scaler.pkl")
+    cube_scaled = scaler.transform(X_cube.reshape(-1, B)).reshape(H, W, B)
+
+    logger.info("Building patches for split='%s'...", split)
+    X_eval, y_eval = build_patch_dataset(cube_scaled, labels_bin, split_arr, split_map_val[split])
+    logger.info("Evaluating %d patches...", len(X_eval))
+
+    md = MODELS_DIR if weights_path is None else weights_path.parent
+    cnn2d_model, thr = load_cnn2d(md, device)
+    if weights_path is not None:
+        state = torch.load(weights_path, map_location=device, weights_only=False)
+        cnn2d_model.load_state_dict(state)
+
+    y_prob = predict_proba_2d(cnn2d_model, X_eval, device)
+    metrics = compute_all_metrics(y_eval, y_prob, thr)
+
+    typer.echo(f"\n=== CNN-2D evaluation — split={split} ===")
+    for k, v in metrics.items():
+        typer.echo(f"  {k:<14} {v:.4f}")
+    typer.echo()
+
+
+# ---------------------------------------------------------------------------
+# 6. PREDICT  (production: zarr -> prediction TIFs)
+# ---------------------------------------------------------------------------
+
+
+@app.command("predict")
+def predict(
+    zarr_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--zarr", help="Preprocessed zarr. Defaults to data/interim/masked_reflectance.zarr."
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-dir",
+            help="Where to write prediction TIFs. Defaults to reports/figures/predictions/.",
+        ),
+    ] = None,
+    weights_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--weights",
+            help="Custom model weights (.pt). Defaults to models/cnn2d_final_model_weights.pt.",
+        ),
+    ] = None,
+    threshold: Annotated[
+        float | None,
+        typer.Option("--threshold", help="Decision threshold. Defaults to locked value (0.3218)."),
+    ] = None,
+) -> None:
+    """Run production inference over a full preprocessed zarr -> GeoTIFFs.
+
+    Outputs:
+      prediction_proba.tif  — P(stressed) float32 per pixel
+      prediction_class.tif  — binary classification uint8 (0/1/255=nodata)
+
+    Border pixels (within 2px of any image edge or NaN region) are set to
+    nodata, matching the exclusion applied during training.
+    """
+    import torch
+
+    from spectralcrop.config.paths import FIGURES_DIR, MODELS_DIR, ZARR_CUBE
+    from spectralcrop.inference.predict import predict_image
+    from spectralcrop.models.dl.predict import load_cnn2d
+
+    zp = zarr_path if zarr_path is not None else ZARR_CUBE
+    odir = output_dir if output_dir is not None else FIGURES_DIR / "predictions"
+
+    _check_zarr_ready(zp)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    md = MODELS_DIR if weights_path is None else weights_path.parent
+    model, locked_thr = load_cnn2d(md, device)
+    if weights_path is not None:
+        import torch as _torch
+
+        model.load_state_dict(_torch.load(weights_path, map_location=device, weights_only=False))
+    thr = threshold if threshold is not None else locked_thr
+
+    typer.echo(f"Predicting {zp} -> {odir}  (threshold={thr:.4f})")
+    proba_path, class_path = predict_image(
+        zarr_path=zp,
+        output_dir=odir,
+        model=model,
+        threshold=thr,
+        device=device,
+    )
+    typer.secho("✅  Prediction maps written:", fg=typer.colors.GREEN)
+    typer.echo(f"   Probability  : {proba_path}")
+    typer.echo(f"   Classification: {class_path}")
+
+
+# ---------------------------------------------------------------------------
+# 7. PREDICT-PIPELINE  (production end-to-end: ENVI -> prediction TIFs)
+# ---------------------------------------------------------------------------
+
+
+@app.command("predict-pipeline")
+def predict_pipeline(
+    envi: Annotated[
+        Path,
+        typer.Option("--envi", help="Path to the ENVI .hdr file of the new image."),
+    ],
+    output_zarr: Annotated[
+        Path | None,
+        typer.Option(
+            "--output-zarr",
+            help="Zarr destination. Defaults to data/interim/masked_reflectance.zarr.",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path | None,
+        typer.Option("--output-dir", help="Where to write prediction TIFs."),
+    ] = None,
+    ndvi_threshold: Annotated[float, typer.Option("--ndvi-threshold")] = 0.3,
+) -> None:
+    """End-to-end production pipeline: ENVI image -> stress prediction maps.
+
+    Step 1: preprocess  (ENVI -> zarr + all 5 VI)
+    Step 2: predict     (zarr -> prediction_proba.tif + prediction_class.tif)
+
+    Use this command when you have a new field image and want predictions
+    without retraining the model.
+    """
+    typer.echo("-- Step 1/2: Preprocessing ---------------------------------")
+    preprocess(envi=envi, output_zarr=output_zarr, ndvi_threshold=ndvi_threshold, resume=False)
+
+    typer.echo("-- Step 2/2: Predicting ------------------------------------")
+    predict(zarr_path=output_zarr, output_dir=output_dir)
+
+    typer.secho("✅  predict-pipeline complete.", fg=typer.colors.GREEN)
+
+
+# ---------------------------------------------------------------------------
+# 8. FULL-PIPELINE  (retraining end-to-end)
+# ---------------------------------------------------------------------------
+
+
+@app.command("full-pipeline")
+def full_pipeline(
+    envi: Annotated[
+        Path,
+        typer.Option("--envi", help="Path to the ENVI .hdr file."),
+    ],
+    gpkg: Annotated[
+        Path | None,
+        typer.Option(
+            "--gpkg",
+            help="GeoPackage with labelled parcels. Defaults to data/raw/labels_export.gpkg.",
+        ),
+    ] = None,
+    output_zarr: Annotated[
+        Path | None,
+        typer.Option("--output-zarr"),
+    ] = None,
+    ndvi_threshold: Annotated[float, typer.Option("--ndvi-threshold")] = 0.3,
+) -> None:
+    """End-to-end retraining pipeline: raw ENVI + labels -> trained CNN-2D.
+
+    Step 1: preprocess    (ENVI -> zarr + VI)
+    Step 2: make-labels   (GeoPackage -> labels_multiclass.tif)
+    Step 3: make-split    (labels -> spatial train/val/test split)
+    Step 4: train-cnn2d   (patches -> trained model + MLflow log)
+    Step 5: evaluate      (test set metrics)
+
+    Use this when you have a new labelled dataset and want to retrain
+    the CNN-2D from scratch.
+    """
+    typer.echo("-- Step 1/5: Preprocessing ---------------------------------")
+    preprocess(envi=envi, output_zarr=output_zarr, ndvi_threshold=ndvi_threshold, resume=False)
+
+    typer.echo("-- Step 2/5: Rasterising labels ----------------------------")
+    make_labels(gpkg=gpkg, zarr_reference=output_zarr)
+
+    typer.echo("-- Step 3/5: Creating spatial split ------------------------")
+    make_split(gpkg=gpkg)
+
+    typer.echo("-- Step 4/5: Training CNN-2D -------------------------------")
+    train_cnn2d(use_locked_hparams=True)
+
+    typer.echo("-- Step 5/5: Evaluating on test set ------------------------")
+    evaluate(split="test")
+
+    typer.secho("✅  full-pipeline complete.", fg=typer.colors.GREEN)
+
+
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    app()

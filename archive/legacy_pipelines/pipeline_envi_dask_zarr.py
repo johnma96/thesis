@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Pipeline ENVI (Dask/xarray+Zarr) con exportación COG y reporte HTML.
 

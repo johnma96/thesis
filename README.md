@@ -1,200 +1,218 @@
-# 📘 Non-invasive diagnosis of the health status of common beans (Phaseolus vulgaris L) in Colombia: An approach based on spectral fingerprinting and artificial intelligence (Master’s Thesis)
+# Non-invasive diagnosis of phosphorus deficiency stress in common beans (*Phaseolus vulgaris* L.)
+## An approach based on spectral fingerprinting and artificial intelligence
 
-- Author: John Mario Montoya Zapata
-- Degree: Master’s Thesis
-- Field: Precision Agriculture · Hyperspectral Imaging · Machine Learning & Deep Learning
+**Author:** John Mario Montoya Zapata  
+**Degree:** Master's Thesis — Universidad Nacional de Colombia  
+**Field:** Precision Agriculture · Hyperspectral Imaging · Machine Learning & Deep Learning  
+**Status:** ✅ Approved (May 2026) — 20 jury observations addressed  
 
-## Version history:
-| User                      | Version | date       |
-|---------------------------|---------|------------|
-| John Mario Montoya Zapata | 0.1.0   | 2025-04-14 |
-| John Mario Montoya Zapata | 1.0.0   | 2026-01-22 |
-|                           |         |            |
+| Version | Date | Notes |
+|---|---|---|
+| 0.1.0 | 2025-04-14 | Initial development |
+| 1.0.0 | 2026-01-22 | Thesis submission |
+| 1.1.0 | 2026-05-12 | Post-jury corrections applied |
+| 1.2.0 | 2026-05-14 | Repository reorganisation (uv, modular package, FastAPI stub) |
 
-## 📌 Overview
+---
 
-This repository contains the complete codebase, data management structure, experiments, and documentation developed for the master’s thesis focused on detecting phosphorus (P) deficiency stress in common bean (Phaseolus vulgaris L.) using UAV-based hyperspectral imagery and machine learning / deep learning techniques.
+## Overview
 
-The project addresses a binary classification problem under real field conditions, combining:
+This repository contains the complete codebase, data management structure, experiments,
+and documentation for detecting **phosphorus (P) deficiency stress** in common bean
+(*Phaseolus vulgaris* L.) using UAV-based **hyperspectral imagery** and ML/DL.
 
-- Hyperspectral data preprocessing and band selection
-- Spectral and spectral–spatial modeling
-- Robust experimental design with spatial data splitting
-- Model tracking, optimization, and reproducibility
+### Key result
 
-## 🧪 Scientific Contributions
+The final **CNN-2D** model (spectro-spatial convolutional network on 5×5 pixel patches)
+achieves **PR-AUC = 0.9635** on the spatially independent test set, substantially
+outperforming all classical ML baselines (PR-AUC 0.79–0.82) and the spectral-only
+CNN-1D (PR-AUC = 0.83).
 
-- End-to-end workflow for handling large hyperspectral datasets using Zarr + DVC
-- Informed spectral band selection using SNR proxy and spectral decorrelation analysis
-- Comparison of ML vs DL approaches, including CNN-1D and CNN-2D
-- Demonstration of the importance of spatial context in nutrient stress detection
-- Reproducible experimentation with MLflow, Optuna, and DVC
+![CNN-2D architecture](reports/figures/arquitectura_cnn2d.png)
+
+---
 
 ## Table of contents
-1. [Model for stress prediction: Architecture CNN-2D](#model-for-stress-prediction-architecture-cnn-2d)
+
+1. [Scientific contributions](#scientific-contributions)
 2. [Repository structure](#repository-structure)
-3. [🔬 Data Management & Reproducibility](#data-management-and-reproducibility)
-4. [📚 Annexes and Technical Reports](#annexes-and-technical-reports)
-5. [🧠 Reproducibility Statement](#reproducibility-statement)
-6. [Cloning this repository](#cloning-this-repository)
-7. [Setting up a virtual environment](#setting-up-a-virtual-environment)
-8. [📄 License](#license)
-9. [📬 Contact](#contact)
+3. [Installation](#installation)
+4. [Pipeline usage](#pipeline-usage)
+5. [Data management and reproducibility](#data-management-and-reproducibility)
+6. [Jury corrections (completed)](#jury-corrections-completed)
+7. [License](#license)
+8. [Contact](#contact)
 
-## Model for stress prediction: Architecture CNN-2D
+---
 
-![diagram](/reports/figures/arquitectura_cnn2d.png)
+## Scientific contributions
 
+- **End-to-end HSI workflow** — hypercube preprocessing, NDVI-based vegetation masking,
+  spectral band selection via SNR proxy + decorrelation, vegetation index computation.
+- **Informed band selection** — 58 spectral bands selected from 363 original bands using
+  SNR proxy and spectral decorrelation; 5 vegetation indices (NDVI, NDRE, CIgreen, PRI, PSRI).
+- **Spatial train/val/test split** — 60 / 20 / 20% across parcel boundaries, preventing
+  spatial leakage that would inflate performance estimates.
+- **CNN-2D with spectro-spatial patches** — 5×5 patches capture local canopy texture,
+  confirming that spatial context improves detection vs spectral-only approaches.
+- **Robustness analysis** — per-genotype performance breakdown + two spectral ablation
+  probes ruling out polygon-geometry memorisation as the source of high PR-AUC.
+- **Vegetation index ablation** (jury correction C #17) — NDRE is the most informative
+  individual index for the CNN-2D (ΔPR-AUC = 0.073); VI collectively contribute 5.5 pp
+  (significant threshold ≥ 0.05).
+- **Reproducible experimentation** — MLflow, Optuna, and DVC throughout.
 
-## Repository structure.
+---
 
-This project structure was partially influenced by the [Cookiecutter Data Science project](https://drivendata.github.io/cookiecutter-data-science/) and [reproducible-model](https://github.com/cmawer/reproducible-model) repository.
-
-Check this [post](https://www.jeremyjordan.me/ml-projects-guide/) by Jeremy Jordan for get guidelines on managing ML projects.
-
-Other resources.
-- Books
-    - [Clean Machine Learning Code](https://leanpub.com/cleanmachinelearningcode)
+## Repository structure
 
 ```
-├── LICENSE
-|
-├── README.md                        <- You are here
-|
-├── .dvc/                            <- Folder with remote source configuration for the DVC library
-|
-├── app/                             <- Folder to store the API that exposes the model
-|
-├── credentials/                     <- Folder to store credentials files
-|
-├── data/                            <- Folder that contains data used or generated
-│   ├── external/                    <- Data from third parties (external to the core company of the project)
-│   ├── interim/                     <- Data in an intermediate state of processing
-│   ├── processed/                   <- Data fully processed and ready to be used in modeling
-│   └── raw/                         <- The original, immutable data dump
-|
-├── docs/                            <- A default Sphinx project; see sphinx-doc.org for details
-|
-├── models/                          <- Trained and serialized models, model predictions, or model summaries
-|
-├── notebooks/                       <- Jupyter notebooks. Naming convention is a number (for ordering),
-│                                       the creator's initials, and a short `-` delimited description, e.g.
-│                                       `101-jmmz-initial-data-exploration.ipynb`.
-|
-├── references/                      <- Data dictionaries, manuals, and all other explanatory materials
-│   ├── others/                      <- Generated graphics and figures to be used in reporting
-│   ├── papers/                      <- Scientific papers used as bibliographic sources
-│   └── logs/                        <- Store some flat file reports concerning the execution of commands by terminal mainly
-|
-├── reports/                         <- Generated analysis as HTML, PDF, LaTeX, etc
-│   ├── figures/                     <- Generated graphics and figures to be used in reporting
-│   ├── pdfs/                        <- PDF files for reporting
-│   └── logs/                        <- Store some flat file reports concerning the execution of commands by terminal mainly
-|
-├── spectralcrop/                    <- Source code for use in this project
-│   ├── __init__.py                  <- Makes src a Python module
-│   ├── archive/                     <- Old scripts that are removed by restructuring the code. They are kept for future reference
-│   ├── data/                        <- Scripts to generate, obtain, clean or load raw data
-│   ├── features/                    <- Scripts to turn data into features for modeling
-│   ├── models/                      <- Scripts to use trained models to make predictions and to retrain models
-│   ├── performance/                 <- Scripts to evaluate the performance of models and to calculate metrics from the trained model 
-│   ├── visualization/               <- Scripts to generate evaluation graphs or reports 
-│   └── utils/
-│      ├── __init__.py
-│      ├── absolute_paths.py         <- Module for handling absolute path
-│      ├── make_connection.py        <- Module to generate connections to different RDBMS
-│      ├── read_sql_file.py          <- Module for queries stored in .sql files
-│      ├── repair_str_columns.py     <- Module to repair columns transformed from string to numbers
-│      ├── save_data.py              <- Module to ingest data to different RDBMS
-│      ├── utilities.py              <- Module with utility functions of the package
-│      └── load_data.py              <- Module for reading data from different RDBMS
-│
-├── queries/                         <- Folder to store .sql files used at some point in the modeling process   
-│   ├── develop/                     <- Queries created in bulding process 
-│   └── production/                  <- Clean queries used to production
-|
-├── tests/                           <- Unit and integration tests
-|
-├── environment.yml                  <- The environment file for reproducing the analysis environment, e.g.
-│                                        generated with `conda env export --from-history --file environment.yml`
-|
-├── requirements*.txt                 <- The requirements file for reproducing the analysis environment, e.g.
-│                                        generated with `pip freeze > requirements.txt`
-|
-├── .gitignore                       <- Gitignore file 
-|
-├── main.py                          <- Main file to orchestrate re-trains and execution of source code stored in src folder
-|
-└── run.sh                           <- Executable with predefined commands to run main.py file on a remote server
+thesis/
+├── spectralcrop/           # Source package (modular, production-ready)
+│   ├── config/             #   paths.py, constants.py (locked hparams)
+│   ├── data/               #   hypercube_processor.py, make_dataset.py
+│   ├── evaluation/         #   metrics.py, confusion_matrices.py, feature_ablation.py
+│   ├── features/           #   patches.py (CNN-2D), vegetation_indices.py, band_selection.py
+│   ├── models/
+│   │   ├── dl/             #   architectures.py, train.py, predict.py
+│   │   └── ml/             #   predict.py (threshold finder)
+│   ├── performance/        #   computational_cost.py
+│   ├── utils/              #   path_manager.py
+│   └── visualization/      #   visualize.py
+├── app/                    # FastAPI inference API (stub, ready for deployment)
+│   ├── routers/            #   health.py, inference.py
+│   ├── schemas/            #   request.py, response.py
+│   ├── services/           #   model_loader.py
+│   └── Dockerfile.example
+├── notebooks/              # 18 Jupyter notebooks (exploration → corrections)
+├── data/                   # DVC-tracked (raw 9.5 GB, interim, processed, external)
+├── models/                 # DVC-tracked model artefacts (20 files, ~77 MB)
+├── reports/
+│   ├── Trabajo Final John Montoya.docx  # ← Final thesis document
+│   └── figures/            # Figures for thesis and jury responses
+├── references/             # Papers and technical reports (DVC-tracked)
+├── tests/                  # Smoke tests
+├── docs/                   # DVC guides, cleanup reports
+├── archive/                # Legacy files (requirements*.txt, setup.py, etc.)
+├── pyproject.toml          # Dependency specification (uv)
+├── uv.lock                 # Locked dependency graph
+├── Makefile                # Common workflow targets
+└── main.py                 # CLI orchestrator (typer)
 ```
 
-## Data Management and Reproducibility
+---
 
-- DVC is used for versioning large datasets and trained models
-- MLflow tracks experiments, metrics, and artifacts
-- Optuna enables Bayesian hyperparameter optimization
-- Zarr allows scalable storage of hyperspectral data cubes
+## Installation
 
-**Remote DVC repository:** https://dagshub.com/johnma96/thesis.s3
+Requires **Python 3.12** and **[uv](https://docs.astral.sh/uv/)**.
 
-## Annexes and Technical Reports
+```bash
+git clone https://github.com/johnma96/thesis.git
+cd thesis
 
-- Annex 32: Spectral data acquisition and field experiment
-- Annex 41: Multispectral and hyperspectral image processing
+# CPU-only (CI, PC A)
+uv sync --extra pytorch-cpu --extra notebooks
 
-Available at: references/technical_reports/
+# GPU — CUDA 12.6 (PC B: RTX 3050)
+uv sync --extra pytorch-cu126 --extra notebooks
 
-### 🚀 Configuración de DVC con Google Drive (OAuth personalizado)
-Scientific papers used You can refer to the description in the [official source](https://dvc.org/doc/user-guide/data-management/remote-storage/google-drive) and the information mentioned in this [stackoverflow] thread (https://stackoverflow.com/questions/75454425/access-blocked-project-has-not-completed-the-google-verification-process) (It is important to look at the comments as they describe the latest GCP graphical interface). You can also consult the step-by-step information [here](docs/README_DVC_GoogleDrive.md) as a bibliographic source.
+# Full development environment
+make install-gpu   # or: make install  (CPU)
+```
 
+See [install.md](install.md) for DVC credentials and detailed instructions.
 
-## Reproducibility Statement
+---
 
-All results reported in the thesis can be reproduced using:
+## Pipeline usage
 
-- Versioned datasets and models (DVC)
-- Fixed random seeds
-- Logged hyperparameters and metrics (MLflow)
-- Explicit environment definitions
+```bash
+# Pull data and models from DagsHub
+make sync
 
+# Retrain CNN-2D with locked hyperparameters
+make train
 
-## Cloning this repository.
+# Evaluate on test set
+make evaluate
 
-- To clone this repository using SSH run the next command in your git console
-> `git clone git@github.com:johnma96/thesis.git`
-- To clone this repository using HTTPS run the next command in your git console
-> `git clone https://github.com/johnma96`
+# Full pipeline (train → evaluate)
+make pipeline
 
-For more details see [Clone a repository](https://docs.gitlab.com/ee/gitlab-basics/start-using-git.html#clone-a-repository).
+# Lint and test
+make lint
+make test
+```
 
-This repository is linked to the [DagsHub](https://dagshub.com/johnma96/thesis) (https://dagshub.com/johnma96/thesis) platform, where data is stored using DVC and models are tracked with MLflow.
+Or directly via the CLI:
 
-## Setting up a virtual environment.
+```bash
+uv run python main.py --help
+uv run python main.py train-cnn2d --use-locked-hparams
+uv run python main.py evaluate --model cnn2d --split test
+```
 
-In order to not create conflics between your libraries and the requirements libraries for this project, we highly recomend you to create a new virtual environment to install the requirements libraries in there.
+---
 
-**Check out the installation guide [here](/install.md)**
+## Data management and reproducibility
 
-For more details consult:
-- Click [here](https://docs.python.org/3/library/venv.html) to see how to create a virtual environment in python.
-- Click [here](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) if you are using conda.
+All large data artefacts are versioned with **DVC** and stored on
+**DagsHub** (`https://dagshub.com/johnma96/thesis`):
 
-### Installing and updating project libraries.
-The required libraries are listed in the file [`requirements.txt`](/requirements.txt), [`requirements-pytorch-cpu.txt`](/requirements-pytorch-cpu.txt) and [`requirements-pytorch-cu126.txt`](/requirements-pytorch-cu126.txt). **Please read [the installation guide](/install.md) information for greater detail.**
+| DVC pointer | Content | Size |
+|---|---|---|
+| `data/raw.dvc` | Raw hyperspectral cube (ENVI), label polygons | ~9.5 GB |
+| `data/interim.dvc` | Masked Zarr cube, band-selection CSVs, label TIF | ~200 MB |
+| `data/processed.dvc` | Split TIFs, training-loss CSVs | ~5 MB |
+| `models.dvc` | 20 model artefacts (weights + scalers) | ~77 MB |
+| `reports/figures.dvc` | All figures | ~30 MB |
+| `references/papers.dvc` | 90 academic papers | ~382 MB |
+
+Experiment tracking: **MLflow** on DagsHub (`https://dagshub.com/johnma96/thesis.mlflow`).
+
+Final CNN-2D registered as `bean_stress_classifier` v1 (Production),
+run_id `61a3cc05f39d46f79f2e3fa3d29fae7f`.
+
+---
+
+## Jury corrections (completed)
+
+All 20 observations by the jury (Manuel Mauricio Goez Mora, ITM, April 2026)
+were addressed and the thesis was approved in May 2026.
+
+| Category | Items | Status |
+|---|---|---|
+| A — Formatting / editing | 3 | ✅ |
+| B — Written clarifications | 12 | ✅ |
+| C — Additional analysis | 4 | ✅ |
+| D — Methodological robustness (CNN-2D) | 1 (with 3 sub-tasks) | ✅ |
+
+See `docs/thesis_corrections/` for the original jury PDF.
+
+---
+
+## Reproducibility statement
+
+- All random seeds fixed at **42** throughout.
+- Spatial split is deterministic (defined once in `notebooks/302-jmmz-spatial-split.ipynb`,
+  stored as `data/processed/splits/by_plot_split_id_binary.tif`).
+- Final CNN-2D hyperparameters locked in `spectralcrop/config/constants.py`
+  and traceable to MLflow run `61a3cc05f39d46f79f2e3fa3d29fae7f`.
+- `uv.lock` pins all 340 transitive dependencies to exact versions.
+- DVC hashes guarantee that the exact data artefacts used in the thesis
+  are retrieved when running `dvc pull`.
+
+---
 
 ## License
 
-### Code
-The source code in this repository is licensed under the [MIT License](/LICENSE).
+- **Code:** MIT — see [LICENSE](LICENSE)
+- **Data:** All Rights Reserved — see [DATA_LICENSE.md](DATA_LICENSE.md)
 
-### Data, Labels and Experimental Results
-All datasets, labels, trained models, figures, and experimental results are **NOT open**.
-They are protected under an ["All Rights Reserved" license](/DATA_LICENSE.md) and may not be reused
-without explicit permission from the author.
+---
 
 ## Contact
 
-- John Mario Montoya Zapata
-- Data scientist, MLOps engineer, Master's degree in analytical engineering 
-- 📧 jmmontoyaz@unal.edu.co, jmmontoyaz13@gmail.com
-- 🔗 [GitHub](https://github.com/johnma96) / [LinkedIn](https://www.linkedin.com/in/john-m-montoya-z-1a375a15b/)
+**John Mario Montoya Zapata**  
+Universidad Nacional de Colombia  
+jmmontoyaz@unal.edu.co · GitHub: [@johnma96](https://github.com/johnma96)
