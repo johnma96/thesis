@@ -36,7 +36,7 @@ dependencies = [
     # --- Experiment tracking / data versioning ---
     "mlflow==3.8.1",
     "dagshub==0.6.4",
-    "dvc[s3,gdrive]==3.63.0",
+    "dvc[s3]==3.63.0",
     # --- Visualization ---
     "matplotlib==3.10.1",
     "seaborn==0.13.2",
