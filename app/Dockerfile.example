@@ -1,0 +1,33 @@
+# Example Dockerfile for deploying the spectralcrop inference API.
+# This is a REFERENCE ONLY — not tested in production.
+#
+# Build:
+#   docker build -f app/Dockerfile.example -t spectralcrop-api:latest .
+#
+# Run:
+#   docker run -p 8000:8000 spectralcrop-api:latest
+
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy project
+COPY pyproject.toml uv.lock ./
+COPY spectralcrop/ spectralcrop/
+COPY app/ app/
+
+# Install runtime + API extras (CPU-only inside container)
+# Note: torch must be installed separately for CPU if not cached
+RUN uv sync --no-dev --extra pytorch-cpu --extra api --frozen
+
+# Copy model weights (or mount via volume in production)
+COPY models/cnn2d_final_model_weights.pt models/
+COPY models/cnn2d_final_model_info.json models/
+COPY models/robust_scaler.pkl models/
+
+EXPOSE 8000
+
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
