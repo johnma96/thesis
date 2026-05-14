@@ -1,1 +1,1 @@
-from .hypercube_processor import HypercubeProcessor
+from .hypercube_processor import HypercubeProcessor as HypercubeProcessor

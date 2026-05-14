@@ -17,8 +17,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.metrics import (
-    average_precision_score, roc_auc_score,
-    f1_score, precision_score, recall_score, accuracy_score,
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
 
 
@@ -104,15 +108,17 @@ def evaluate_ablation_grid(
         y_prob = predict_fn(X_abl)
         y_pred = (y_prob >= threshold).astype(int)
 
-        rows.append({
-            "Modelo":      model_name,
-            "Condicion":   cond_name,
-            "PR-AUC":      round(average_precision_score(y_test, y_prob), 4),
-            "ROC-AUC":     round(roc_auc_score(y_test, y_prob), 4),
-            "F1-macro":    round(f1_score(y_test, y_pred, average="macro"), 4),
-            "Recall_1":    round(recall_score(y_test, y_pred), 4),
-            "Precision_1": round(precision_score(y_test, y_pred, zero_division=0), 4),
-            "Accuracy":    round(accuracy_score(y_test, y_pred), 4),
-        })
+        rows.append(
+            {
+                "Modelo": model_name,
+                "Condicion": cond_name,
+                "PR-AUC": round(average_precision_score(y_test, y_prob), 4),
+                "ROC-AUC": round(roc_auc_score(y_test, y_prob), 4),
+                "F1-macro": round(f1_score(y_test, y_pred, average="macro"), 4),
+                "Recall_1": round(recall_score(y_test, y_pred), 4),
+                "Precision_1": round(precision_score(y_test, y_pred, zero_division=0), 4),
+                "Accuracy": round(accuracy_score(y_test, y_pred), 4),
+            }
+        )
 
     return pd.DataFrame(rows)
