@@ -1,0 +1,1 @@
+{"best_thr": 0.4505050505050505, "n_channels": 1, "input_len": 63, "architecture": "Spectral1DCNN", "lr": 0.001, "batch_size": 256, "kernel_size": 5, "max_epochs": 200, "patience": 20, "weight_decay": 1e-05, "dropout": 0.3, "seed": 42}
