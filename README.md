@@ -215,4 +215,4 @@ See `docs/thesis_corrections/` for the original jury PDF.
 
 **John Mario Montoya Zapata**  
 Universidad Nacional de Colombia  
-jmmontoyaz@unal.edu.co · GitHub: [@johnma96](https://github.com/johnma96)
+jmmontoyaz@unal.edu.co · GitHub: [@johnma96](https://github.com/johnma96) · [johnmontoya.vercel.app](https://johnmontoya.vercel.app/)
