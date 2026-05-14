@@ -1,11 +1,9 @@
 """Tests for spectralcrop/data/preprocessing.py — vegetation index computation."""
 
 import numpy as np
-import pytest
 import xarray as xr
 
 from spectralcrop.data.preprocessing import _nearest_band_in_range, add_vegetation_indices
-
 
 # ---------------------------------------------------------------------------
 # _nearest_band_in_range
@@ -84,13 +82,14 @@ def _make_synthetic_zarr(tmp_path, n_bands: int = 10):
     nv[:] = ndvi
 
     # Add dimension coordinates so xarray can open it
-    ds = xr.open_zarr(store_path)
+    xr.open_zarr(store_path)  # validates store is xarray-compatible
     return store_path, H, W
 
 
 def test_add_vegetation_indices_creates_variables(tmp_path):
     """add_vegetation_indices must write NDRE, CIgreen, PRI, PSRI to the zarr."""
     from pathlib import Path
+
     import zarr
 
     store_path, H, W = _make_synthetic_zarr(tmp_path, n_bands=20)
@@ -106,6 +105,7 @@ def test_add_vegetation_indices_creates_variables(tmp_path):
 def test_add_vegetation_indices_produces_finite_values(tmp_path):
     """All VI values for valid (non-zero reflectance) pixels must be finite."""
     from pathlib import Path
+
     import zarr
 
     store_path, H, W = _make_synthetic_zarr(tmp_path, n_bands=20)

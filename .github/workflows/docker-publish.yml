@@ -1,0 +1,70 @@
+name: Build and push Docker image to Artifact Registry
+
+# Triggers only on merges to main — not on every PR push.
+on:
+  push:
+    branches: [main]
+    paths:
+      # Re-build only when these files change (avoids unnecessary builds)
+      - "Dockerfile.batch"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "spectralcrop/**"
+      - "scripts/batch_predict.py"
+      - "main.py"
+
+env:
+  GCP_REGION:     us-central1
+  AR_REPOSITORY:  spectralcrop          # Artifact Registry repository name
+  IMAGE_NAME:     batch                 # Image name inside the repository
+
+jobs:
+  build-push:
+    name: Build + push Dockerfile.batch
+    runs-on: ubuntu-latest
+
+    # Required permissions for Workload Identity Federation (keyless auth)
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── GCP authentication via Workload Identity Federation ──────────────
+      # Keyless auth — no service account JSON stored in GitHub secrets.
+      # Requires one-time setup in GCP (see docs/gcp_deployment_proposal.md).
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account:            ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+      # ── Build and push ───────────────────────────────────────────────────
+      - name: Build Docker image
+        run: |
+          docker build \
+            -f Dockerfile.batch \
+            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
+            .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Summary
+        run: |
+          echo "### Docker image published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ env.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

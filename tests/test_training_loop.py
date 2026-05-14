@@ -5,8 +5,8 @@ import pytest
 
 torch = pytest.importorskip("torch", reason="torch not installed — skip training tests")
 
-from spectralcrop.models.dl.architectures import SpectralSpatialCNN2D
-from spectralcrop.models.dl.train import fit_cnn2d
+from spectralcrop.models.dl.architectures import SpectralSpatialCNN2D  # noqa: E402
+from spectralcrop.models.dl.train import fit_cnn2d  # noqa: E402
 
 
 def _tiny_dataset(n: int = 64, n_channels: int = 8, patch: int = 3, seed: int = 0):

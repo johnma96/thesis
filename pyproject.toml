@@ -72,12 +72,16 @@ notebooks = [
     "nbformat>=5.10",
     "lazypredict==0.2.12",
 ]
-# API serving
+# API serving (FastAPI REST endpoint)
 api = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.32",
     "pydantic>=2.9",
     "python-multipart>=0.0.9",
+]
+# GCP batch jobs (Cloud Run Jobs, Cloud Storage)
+gcp = [
+    "google-cloud-storage>=2.18",
 ]
 # Development (lint, test, type-checking)
 dev = [
